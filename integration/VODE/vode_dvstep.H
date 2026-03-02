@@ -148,6 +148,7 @@ int dvstep (BurnT& state, DvodeT& vstate)
     }
 #endif
 #ifdef SDC
+// TODO(#3)(james471): Check what needs to be done for radiation variables
     amrex::Real rho_old = state.rho_orig + TOLD * state.ydot_a[SRHO];
     for (int i = 1; i <= int_neqs; ++i) {
         y_save(i) = vstate.y(i);
@@ -234,6 +235,7 @@ int dvstep (BurnT& state, DvodeT& vstate)
         }
 #endif
 
+        // TODO(#2)(james471): Add radiation checks here
         for (int i = 1; i <= NumSpec; ++i) {
 
 #ifdef STRANG
@@ -304,6 +306,64 @@ int dvstep (BurnT& state, DvodeT& vstate)
                 break;
             }
 
+#endif
+
+        }
+
+        for (int i = net_ienuc + 1; i <= int_neqs; i+=2) {
+
+#ifdef STRANG
+            // Constrain radiation quantities such that they don't change by more than a certain
+            // factor in a given step (as long as their initial value was large enough
+            // for us to worry about).
+
+            if (std::abs(y_save(i)) > integrator_rp::X_reject_buffer * vstate.atol_rad_num &&
+                std::abs(vstate.y(i)) > integrator_rp::X_reject_buffer * vstate.atol_rad_num &&
+                (std::abs(vstate.y(i)) > vode_increase_change_factor * std::abs(y_save(i)) ||
+                 std::abs(vstate.y(i)) < vode_decrease_change_factor * std::abs(y_save(i)))) {
+#ifdef MICROPHYSICS_DEBUG
+#ifndef AMREX_USE_GPU
+               std::cout << "rejecting step based on species " << i << " from " << y_save(i) << " to " << vstate.y(i) << std::endl;
+#endif
+#endif
+                valid_update = false;
+                break;
+            }
+
+            if (std::abs(y_save(i+1)) > integrator_rp::X_reject_buffer * vstate.atol_rad_flux &&
+                std::abs(vstate.y(i+1)) > integrator_rp::X_reject_buffer * vstate.atol_rad_flux &&
+                (std::abs(vstate.y(i+1)) > vode_increase_change_factor * std::abs(y_save(i+1)) ||
+                 std::abs(vstate.y(i+1)) < vode_decrease_change_factor * std::abs(y_save(i+1)))) {
+#ifdef MICROPHYSICS_DEBUG
+#ifndef AMREX_USE_GPU
+               std::cout << "rejecting step based on species " << i+1 << " from " << y_save(i+1) << " to " << vstate.y(i+1) << std::endl;
+#endif
+#endif
+                valid_update = false;
+                break;
+            }
+
+            // Constrain abundances such that they are not negative (within a tolerance)
+            // or greater than one (within a tolerance).
+            if (vstate.y(i) < -radiation_failure_tolerance) {
+                valid_update = false;
+                break;
+            }
+
+            // Don't enforce the condition below if
+            // vstate.y contains number densities
+            if (! integrator_rp::use_number_densities) {
+                if (vstate.y(i) > 1.0_rt + radiation_failure_tolerance) {
+                    valid_update = false;
+                    break;
+                }
+            }
+
+#endif
+
+#ifdef SDC
+            // Abort the program. This is unimplemented
+            amrex::Abort("SDC does not yet support radiation updates");
 #endif
 
         }

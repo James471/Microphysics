@@ -5,12 +5,20 @@
 
 // Define the size of the ODE system that VODE will integrate
 
+#ifndef PHOTOCHEMISTRY
 constexpr int INT_NEQS = NumSpec + 1;
+#else
+constexpr int INT_NEQS = NumRadEqs + NumSpec + 1;
+#endif
 
 // We will use this parameter to determine if a given species
 // abundance is unreasonably small or large (each X must satisfy
 // -failure_tolerance <= X <= 1.0 + failure_tolerance).
 constexpr amrex::Real species_failure_tolerance = 1.e-2_rt;
+// We will use this parameter to determine if 
+// a given radiation quantity (number density or flux) is 
+// unreasonably small (each quantity must satisfy X >= -radiation_failure_tolerance).
+constexpr amrex::Real radiation_failure_tolerance = 1.e-2_rt;
 
 #ifdef NSE
 constexpr int MIN_NSE_BAILOUT_STEPS = 10;
@@ -38,6 +46,9 @@ constexpr int integrator_neqs ()
 #ifdef STRANG
     if constexpr (has_xn<BurnT>::value) {
         int_neqs += NumSpec;
+#ifdef PHOTOCHEMISTRY
+        int_neqs += NumRadEqs;
+#endif
     }
 
     if constexpr (has_energy<BurnT>::value) {
@@ -45,6 +56,9 @@ constexpr int integrator_neqs ()
     }
 #else
     int_neqs = NumSpec + 1;
+#ifdef PHOTOCHEMISTRY
+    int_neqs += NumRadEqs;
+#endif
 #endif
 
     return int_neqs;
