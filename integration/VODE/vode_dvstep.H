@@ -1,6 +1,7 @@
 #ifndef VODE_DVSTEP_H
 #define VODE_DVSTEP_H
 
+#include "network.H"
 #include <vode_type.H>
 #include <vode_dvset.H>
 #include <vode_dvjust.H>
@@ -148,7 +149,6 @@ int dvstep (BurnT& state, DvodeT& vstate)
     }
 #endif
 #ifdef SDC
-// TODO(#3)(james471): Check what needs to be done for radiation variables
     amrex::Real rho_old = state.rho_orig + TOLD * state.ydot_a[SRHO];
     for (int i = 1; i <= int_neqs; ++i) {
         y_save(i) = vstate.y(i);
@@ -235,7 +235,6 @@ int dvstep (BurnT& state, DvodeT& vstate)
         }
 #endif
 
-        // TODO(#2)(james471): Add radiation checks here
         for (int i = 1; i <= NumSpec; ++i) {
 
 #ifdef STRANG
@@ -310,7 +309,7 @@ int dvstep (BurnT& state, DvodeT& vstate)
 
         }
 
-        for (int i = net_ienuc + 1; i <= int_neqs; i+=2) {
+        for (int i = net_ienuc + 1; i <= int_neqs; i+=MicrophysicsNumRadVarsPerGroup) {
 
 #ifdef STRANG
             // Constrain radiation quantities such that they don't change by more than a certain
@@ -349,16 +348,6 @@ int dvstep (BurnT& state, DvodeT& vstate)
                 valid_update = false;
                 break;
             }
-
-            // Don't enforce the condition below if
-            // vstate.y contains number densities
-            if (! integrator_rp::use_number_densities) {
-                if (vstate.y(i) > 1.0_rt + radiation_failure_tolerance) {
-                    valid_update = false;
-                    break;
-                }
-            }
-
 #endif
 
 #ifdef SDC

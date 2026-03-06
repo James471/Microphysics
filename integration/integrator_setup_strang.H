@@ -20,7 +20,10 @@ struct state_backup_t {
     amrex::Real e_in{};
 #ifndef AMREX_USE_GPU
     amrex::Real xn_in[NumSpec]{};
+#ifdef PHOTOCHEMISTRY
     amrex::Real rn_in[NumRadEqs]{};
+    amrex::Real c_hat;
+#endif
 #endif
 };
 
@@ -125,9 +128,12 @@ state_backup_t integrator_backup (const BurnT& state) {
     for (int n = 0; n < NumSpec; ++n) {
         state_save.xn_in[n] = state.xn[n];
     }
+#ifdef PHOTOCHEMISTRY
     for (int n = 0; n < NumRadEqs; ++n) {
         state_save.rn_in[n] = state.rn[n];
     }
+    state_save.c_hat = state.c_hat;
+#endif
 #endif
     state_save.T_in = state.T;
     state_save.e_in = state.e;
@@ -238,6 +244,7 @@ void integrator_cleanup (IntegratorT& int_state, BurnT& state,
             }
 #ifdef PHOTOCHEMISTRY
             std::cout << std::endl;
+            std::cout << "(Reduced) Speed of light = " << std::setprecision(16) << state.c_hat << std::endl;
             std::cout << "rn start = ";
             for (const double X : state_save.rn_in) {
                 std::cout << std::scientific << std::setprecision(16) << X << " ";
