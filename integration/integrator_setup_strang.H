@@ -207,11 +207,13 @@ void integrator_cleanup (IntegratorT& int_state, BurnT& state,
             }
         }
     }
+#ifdef PHOTOCHEMISTRY
     for (int n = net_ienuc+1; n <= net_ienuc+NumRadEqs; n += MicrophysicsNumRadVarsPerGroup) {
         if (int_state.y(n) < -radiation_failure_tolerance) {
             state.success = false;
         }
     }
+#endif
 
 #ifndef AMREX_USE_GPU
     if (integrator_rp::burner_verbose) {

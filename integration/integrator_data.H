@@ -15,10 +15,12 @@ constexpr int INT_NEQS = NumRadEqs + NumSpec + 1;
 // abundance is unreasonably small or large (each X must satisfy
 // -failure_tolerance <= X <= 1.0 + failure_tolerance).
 constexpr amrex::Real species_failure_tolerance = 1.e-2_rt;
+#ifdef PHOTOCHEMISTRY
 // We will use this parameter to determine if 
 // a given radiation quantity (number density or flux) is 
 // unreasonably small (each quantity must satisfy X >= -radiation_failure_tolerance).
 constexpr amrex::Real radiation_failure_tolerance = 1.e-2_rt;
+#endif
 
 #ifdef NSE
 constexpr int MIN_NSE_BAILOUT_STEPS = 10;
