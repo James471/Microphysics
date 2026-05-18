@@ -1,3 +1,5 @@
+.. _sec:unit_tests:
+
 **********************
 Overview of Unit Tests
 **********************
@@ -115,12 +117,12 @@ by options in the input file.
 One-zone tests
 ==============
 
-.. index:: burn_cell, burn_cell_primordial_chem, burn_cell_sdc, eos_cell, jac_cell, nse_table_cell, nse_net_cell, part_func_cell
+.. index:: burn_cell, burn_cell_primordial_chem, burn_cell_sdc, eos_cell, jac_cell, nse_table_cell, nse_net_cell, part_func_cell, interp_cell
 
 * ``burn_cell`` :
 
   given a $\rho$, $T$, and $X_k$, integrate a reaction network through a specified time
-  and output the new state.
+  and output the new state.  See :ref:`sec:burn_cell` for more information.
 
 * ``burn_cell_primordial_chem`` :
 
@@ -129,18 +131,24 @@ One-zone tests
 * ``burn_cell_sdc`` :
 
   similar to ``burn_cell`` except this uses the SDC integration code paths.
+  See :ref:`sec:burn_cell_sdc` for more information.
 
 * ``eos_cell`` :
 
   given a $\rho$, $T$, and $X_k$, call the equation of state and print out
-  the thermodynamic information.
+  the thermodynamic information.  See :ref:`sec:eos_cell` for more information.
+
+* ``interp_cell`` :
+
+  This tests the cubic interpolant used in pynucastro networks for interpolating
+  a rate that is given as pairs of $(T, N_A \langle \sigma v \rangle)$.
 
 * ``jac_cell`` :
 
   for a single thermodynamic state, compute the analytic Jacobian
   (using the functions provided by the network) and a numerical
   finite-difference approximation to the Jacobian and output them,
-  element-by-element, to the display.
+  element-by-element, to the display.  See :ref:`sec:jac_cell` for more information.
 
 * ``nse_table_cell`` :
 
