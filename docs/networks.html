@@ -113,6 +113,7 @@
 <li class="toctree-l1"><a class="reference internal" href="ode_integrators.html">ODE Integrators</a></li>
 <li class="toctree-l1"><a class="reference internal" href="nse.html">NSE</a></li>
 <li class="toctree-l1"><a class="reference internal" href="sdc.html">Spectral Deferred Corrections</a></li>
+<li class="toctree-l1"><a class="reference internal" href="burn_failures.html">Dealing with Burn Failures</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Util / external libraries</span></p>
 <ul>
@@ -604,10 +605,8 @@ have</p>
 the reaction zone thickness. In terms of mass fractions, <span class="math notranslate nohighlight">\(n_f = \rho
 X_a / (A_a m_u)\)</span>, our rate equation is</p>
 <div class="math notranslate nohighlight">
-\[\begin{split}\begin{align}
- \frac{dX_f}{dt} &amp;= - \frac{r_0}{m_u} \rho X_f^2 \frac{1}{A_f} \left (\frac{T}{T_0}\right)^\nu \equiv \omegadot_f  \\
- \frac{dX_a}{dt} &amp;= \frac{1}{2}\frac{r_0}{m_u} \rho X_f^2 \frac{A_a}{A_f^2} \left (\frac{T}{T_0}\right)^\nu = \frac{r_0}{m_u} \rho X_f^2 \frac{1}{A_f} \left (\frac{T}{T_0}\right)^\nu
-\end{align}\end{split}\]</div>
+\[\begin{split}\frac{dX_f}{dt} &amp;= - \frac{r_0}{m_u} \rho X_f^2 \frac{1}{A_f} \left (\frac{T}{T_0}\right)^\nu \equiv \omegadot_f  \\
+\frac{dX_a}{dt} &amp;= \frac{1}{2}\frac{r_0}{m_u} \rho X_f^2 \frac{A_a}{A_f^2} \left (\frac{T}{T_0}\right)^\nu = \frac{r_0}{m_u} \rho X_f^2 \frac{1}{A_f} \left (\frac{T}{T_0}\right)^\nu\end{split}\]</div>
 <p>We define a new rate constant, <span class="math notranslate nohighlight">\(\rt\)</span> with units of <span class="math notranslate nohighlight">\([\mathrm{s^{-1}}]\)</span> as</p>
 <div class="math notranslate nohighlight">
 \[\begin{split}\rt =  \begin{cases}
