@@ -20,6 +20,10 @@ struct state_backup_t {
     amrex::Real e_in{};
 #ifndef AMREX_USE_GPU
     amrex::Real xn_in[NumSpec]{};
+#ifdef PHOTOCHEMISTRY
+    amrex::Real rn_in[NumRadEqs]{};
+    amrex::Real c_hat;
+#endif
 #endif
 };
 
@@ -38,6 +42,13 @@ IntegratorT integrator_setup (BurnT& state, amrex::Real dt, bool is_retry)
 
         int_state.rtol_spec = integrator_rp::rtol_spec; // mass fractions
         int_state.rtol_enuc = integrator_rp::rtol_enuc; // energy generated
+#ifdef PHOTOCHEMISTRY
+        int_state.atol_rad_num = integrator_rp::atol_rad_num; // radiation number density
+        int_state.atol_rad_flux = integrator_rp::atol_rad_flux; // radiation flux
+
+        int_state.rtol_rad_num = integrator_rp::rtol_rad_num; // radiation number density
+        int_state.rtol_rad_flux = integrator_rp::rtol_rad_flux; // radiation flux
+#endif
     } else {
         int_state.atol_spec = integrator_rp::retry_atol_spec > 0 ?
             integrator_rp::retry_atol_spec : integrator_rp::atol_spec; // mass fractions
@@ -48,6 +59,16 @@ IntegratorT integrator_setup (BurnT& state, amrex::Real dt, bool is_retry)
             integrator_rp::retry_rtol_spec : integrator_rp::rtol_spec; // mass fractions
         int_state.rtol_enuc = integrator_rp::retry_rtol_enuc > 0 ?
             integrator_rp::retry_rtol_enuc : integrator_rp::rtol_enuc; // energy generated
+#ifdef PHOTOCHEMISTRY
+        int_state.atol_rad_num = integrator_rp::retry_atol_rad_num > 0 ?
+            integrator_rp::retry_atol_rad_num : integrator_rp::atol_rad_num; // radiation number density
+        int_state.atol_rad_flux = integrator_rp::retry_atol_rad_flux > 0 ?
+            integrator_rp::retry_atol_rad_flux : integrator_rp::atol_rad_flux; // radiation flux
+        int_state.rtol_rad_num = integrator_rp::retry_rtol_rad_num > 0 ?
+            integrator_rp::retry_rtol_rad_num : integrator_rp::rtol_rad_num; // radiation number density
+        int_state.rtol_rad_flux = integrator_rp::retry_rtol_rad_flux > 0 ?
+            integrator_rp::retry_rtol_rad_flux : integrator_rp::rtol_rad_flux; // radiation flux
+#endif
     }
 
     // set the Jacobian type
@@ -107,6 +128,12 @@ state_backup_t integrator_backup (const BurnT& state) {
     for (int n = 0; n < NumSpec; ++n) {
         state_save.xn_in[n] = state.xn[n];
     }
+#ifdef PHOTOCHEMISTRY
+    for (int n = 0; n < NumRadEqs; ++n) {
+        state_save.rn_in[n] = state.rn[n];
+    }
+    state_save.c_hat = state.c_hat;
+#endif
 #endif
     state_save.T_in = state.T;
     state_save.e_in = state.e;
@@ -146,6 +173,8 @@ void integrator_cleanup (IntegratorT& int_state, BurnT& state,
     state.n_jac = int_state.n_jac;
     state.n_step = int_state.n_step;
 
+    state.error_code = static_cast<short>(istate);
+
     // The integrator may not always fail even though it can lead to
     // unphysical states.  Add some checks that indicate a burn fail
     // even if the integrator thinks the integration was successful.
@@ -155,18 +184,25 @@ void integrator_cleanup (IntegratorT& int_state, BurnT& state,
     }
 
     for (int n = 1; n <= NumSpec; ++n) {
-        if (int_state.y(n) < -species_failure_tolerance) {
+        if (int_state.y(n) < -integrator_rp::species_failure_tolerance) {
             state.success = false;
         }
 
         // Don't enforce a max if we are evolving number densities
 
         if (! integrator_rp::use_number_densities) {
-            if (int_state.y(n) > 1.0_rt + species_failure_tolerance) {
+            if (int_state.y(n) > 1.0_rt + integrator_rp::species_failure_tolerance) {
                 state.success = false;
             }
         }
     }
+#ifdef PHOTOCHEMISTRY
+    for (int n = net_ienuc+1; n <= net_ienuc+NumRadEqs; n += MicrophysicsNumRadVarsPerGroup) {
+        if (int_state.y(n) < -integrator_rp::radiation_failure_tolerance) {
+            state.success = false;
+        }
+    }
+#endif
 
 #ifndef AMREX_USE_GPU
     if (integrator_rp::burner_verbose) {
@@ -196,6 +232,13 @@ void integrator_cleanup (IntegratorT& int_state, BurnT& state,
         for (const double X : state_save.xn_in) {
             std::cout << std::scientific << std::setprecision(OUTDIGITS) << X << " ";
         }
+#ifdef PHOTOCHEMISTRY
+        std::cout << std::endl;
+        std::cout << "rn start = ";
+        for (const double X : state_save.rn_in) {
+            std::cout << std::scientific << std::setprecision(OUTDIGITS) << X << " ";
+        }
+#endif
         std::cout << std::endl;
         std::cout << "dens current = " << std::setprecision(OUTDIGITS) << state.rho << std::endl;
         std::cout << "temp current = " << std::setprecision(OUTDIGITS) << state.T << std::endl;
@@ -203,6 +246,13 @@ void integrator_cleanup (IntegratorT& int_state, BurnT& state,
         for (const double X : state.xn) {
             std::cout << std::scientific << std::setprecision(OUTDIGITS) << X << " ";
         }
+#ifdef PHOTOCHEMISTRY
+        std::cout << std::endl;
+        std::cout << "rn current = ";
+        for (const double X : state.rn) {
+            std::cout << std::scientific << std::setprecision(OUTDIGITS) << X << " ";
+        }
+#endif
         std::cout << std::endl;
         std::cout << "energy generated = " << state.e << std::endl;
 #elif defined(ALLOW_GPU_PRINTF)
