@@ -113,7 +113,7 @@ function(setup_target_for_microphysics_compilation network_name output_dir)
 
     #DO NOT change the order of the directories below!
     set (photoionization_dirs ${CMAKE_BINARY_DIR} ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/util ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/util/gcem/include
-                             ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/integration/VODE ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/integration/utils
+                             ${integrator_dir} ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/integration/utils
                              ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/integration ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/interfaces
                              ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/EOS ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/EOS/photoionization
                              ${CMAKE_SOURCE_DIR}/src/networks/photoionization ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/networks

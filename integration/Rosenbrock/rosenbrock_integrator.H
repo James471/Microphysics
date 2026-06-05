@@ -126,14 +126,32 @@ template <typename RosenbrockT>
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 amrex::Real rtol_for (const RosenbrockT& rstate, const int n)
 {
-    return n == net_ienuc ? rstate.rtol_enuc : rstate.rtol_spec;
+    if (n == net_ienuc) {
+        return rstate.rtol_enuc;
+    }
+#ifdef PHOTOCHEMISTRY
+    if (n > net_ienuc) {
+        const int group_offset = (n - net_ienuc - 1) % MicrophysicsNumRadVarsPerGroup;
+        return group_offset == 0 ? rstate.rtol_rad_num : rstate.rtol_rad_flux;
+    }
+#endif
+    return rstate.rtol_spec;
 }
 
 template <typename RosenbrockT>
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 amrex::Real atol_for (const RosenbrockT& rstate, const int n)
 {
-    return n == net_ienuc ? rstate.atol_enuc : rstate.atol_spec;
+    if (n == net_ienuc) {
+        return rstate.atol_enuc;
+    }
+#ifdef PHOTOCHEMISTRY
+    if (n > net_ienuc) {
+        const int group_offset = (n - net_ienuc - 1) % MicrophysicsNumRadVarsPerGroup;
+        return group_offset == 0 ? rstate.atol_rad_num : rstate.atol_rad_flux;
+    }
+#endif
+    return rstate.atol_spec;
 }
 
 template <int int_neqs>
@@ -231,6 +249,14 @@ bool valid_integrator_state (const amrex::Array1D<amrex::Real, 1, int_neqs>& y)
             return false;
         }
     }
+
+#ifdef PHOTOCHEMISTRY
+    for (int n = net_ienuc+1; n <= net_ienuc+NumRadEqs; n += MicrophysicsNumRadVarsPerGroup) {
+        if (y(n) < -integrator_rp::atol_rad_num) {
+            return false;
+        }
+    }
+#endif
 
     if (y(net_ienuc) <= 0.0_rt) {
         return false;
