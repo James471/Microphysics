@@ -132,7 +132,7 @@ amrex::Real rtol_for (const RosenbrockT& rstate, const int n)
 #ifdef PHOTOCHEMISTRY
     if (n > net_ienuc) {
         const int group_offset = (n - net_ienuc - 1) % MicrophysicsNumRadVarsPerGroup;
-        return group_offset == 0 ? rstate.rtol_rad_num : rstate.rtol_rad_flux;
+        return group_offset == 0 ? rstate.rtol_rad_num : 1.0e30;
     }
 #endif
     return rstate.rtol_spec;
@@ -148,7 +148,7 @@ amrex::Real atol_for (const RosenbrockT& rstate, const int n)
 #ifdef PHOTOCHEMISTRY
     if (n > net_ienuc) {
         const int group_offset = (n - net_ienuc - 1) % MicrophysicsNumRadVarsPerGroup;
-        return group_offset == 0 ? rstate.atol_rad_num : rstate.atol_rad_flux;
+        return group_offset == 0 ? rstate.atol_rad_num : 1.0e30;
     }
 #endif
     return rstate.atol_spec;
@@ -162,8 +162,18 @@ amrex::Real error_norm (const rosenbrock_t<int_neqs>& rstate)
     for (int n = 1; n <= int_neqs; ++n) {
         const amrex::Real sk = atol_for(rstate, n) +
             rtol_for(rstate, n) * amrex::max(std::abs(rstate.y(n)), std::abs(rstate.ynew(n)));
-        const amrex::Real term = rstate.work(n) / sk;
-        err += term * term;
+#ifdef PHOTOCHEMISTRY
+    const int group_offset = (n - net_ienuc - 1) % MicrophysicsNumRadVarsPerGroup;
+    amrex::Real term;
+    if (n > net_ienuc && group_offset != 0) {
+        term = 0.0_rt;
+    } else {
+        term = rstate.work(n) / sk;
+    }
+#else
+    const amrex::Real term = rstate.work(n) / sk;
+#endif
+    err += term * term;
     }
     return std::sqrt(err / static_cast<amrex::Real>(int_neqs));
 }
@@ -177,6 +187,13 @@ bool species_change_valid (const rosenbrock_t<int_neqs>& rstate)
     constexpr amrex::Real decrease_change_factor = 0.25_rt;
 
     for (int i = 1; i <= NumSpec; ++i) {
+#ifdef PHOTOCHEMISTRY
+        // Skip rad flux
+        const int group_offset = (i - net_ienuc - 1);
+        if (group_offset >= 0 && group_offset % MicrophysicsNumRadVarsPerGroup != 0) {
+            continue;
+        }
+#endif
         if (std::abs(rstate.y(i)) > integrator_rp::X_reject_buffer * rstate.atol_spec &&
             std::abs(rstate.ynew(i)) > integrator_rp::X_reject_buffer * rstate.atol_spec &&
             (std::abs(rstate.ynew(i)) > increase_change_factor * std::abs(rstate.y(i)) ||
@@ -203,6 +220,13 @@ amrex::Real yass_change_norm (const rosenbrock_t<int_neqs>& rstate)
     const amrex::Real active_floor = integrator_rp::yass_floor * max_species;
 
     for (int i = 1; i <= NumSpec && i <= int_neqs; ++i) {
+#ifdef PHOTOCHEMISTRY
+        // Skip rad flux
+        const int group_offset = (i - net_ienuc - 1);
+        if (group_offset >= 0 && group_offset % MicrophysicsNumRadVarsPerGroup != 0) {
+            continue;
+        }
+#endif
         const amrex::Real yi = std::abs(rstate.y(i));
         if (yi > active_floor) {
             max_change = amrex::max(max_change, std::abs(rstate.ynew(i) - rstate.y(i)) / yi);
