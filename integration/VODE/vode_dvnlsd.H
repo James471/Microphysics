@@ -133,6 +133,10 @@ amrex::Real dvnlsd (int& NFLAG, BurnT& state, DvodeT& vstate)
 
             DEL = 0.0_rt;
             for (int i = 1; i <= int_neqs; ++i) {
+#ifdef PHOTOCHEMISTRY
+                // skip radiation flux — passive scalar, one-way coupled
+                if (i > net_ienuc && (i - net_ienuc - 1) % MicrophysicsNumRadVarsPerGroup != 0) continue;
+#endif
                 DEL += (vstate.y(i) * vstate.ewt(i)) * (vstate.y(i) * vstate.ewt(i));
             }
             DEL = std::sqrt(DEL / int_neqs);
@@ -233,6 +237,10 @@ amrex::Real dvnlsd (int& NFLAG, BurnT& state, DvodeT& vstate)
     if (M > 0) {
         ACNRM = 0.0_rt;
         for (int i = 1; i <= int_neqs; ++i) {
+#ifdef PHOTOCHEMISTRY
+            // skip radiation flux — passive scalar, one-way coupled
+            if (i > net_ienuc && (i - net_ienuc - 1) % MicrophysicsNumRadVarsPerGroup != 0) continue;
+#endif
             ACNRM += (vstate.acor(i) * vstate.ewt(i)) * (vstate.acor(i) * vstate.ewt(i));
         }
         ACNRM = std::sqrt(ACNRM / int_neqs);

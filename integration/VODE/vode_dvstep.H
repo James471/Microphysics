@@ -322,18 +322,9 @@ int dvstep (BurnT& state, DvodeT& vstate)
                 break;
             }
 
-            if (std::abs(y_save(i+1)) > integrator_rp::X_reject_buffer * vstate.atol_rad_flux &&
-                std::abs(vstate.y(i+1)) > integrator_rp::X_reject_buffer * vstate.atol_rad_flux &&
-                (std::abs(vstate.y(i+1)) > vode_increase_change_factor * std::abs(y_save(i+1)) ||
-                 std::abs(vstate.y(i+1)) < vode_decrease_change_factor * std::abs(y_save(i+1)))) {
-#ifdef MICROPHYSICS_DEBUG
-#ifndef AMREX_USE_GPU
-               std::cout << "rejecting step based on species " << i+1 << " from " << y_save(i+1) << " to " << vstate.y(i+1) << std::endl;
-#endif
-#endif
-                valid_update = false;
-                break;
-            }
+            // Flux change-factor check removed: flux is a passive scalar, one-way coupled.
+            // Convergence of N_gamma ensures convergence of flux; checking flux here
+            // wastes steps in dark cells where flux -> 0.
 
             // Constrain abundances such that they are not negative (within a tolerance)
             // or greater than one (within a tolerance).
