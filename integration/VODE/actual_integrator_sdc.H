@@ -28,7 +28,8 @@ void actual_integrator (BurnT& state, amrex::Real dt, bool is_retry=false)
     state.error_code = istate;
 
     integrator_cleanup(vode_state, state, istate, state_save, dt,
-                       vode_final_state_species_failure_tolerance_factor);
+                       vode_final_state_species_failure_tolerance_factor,
+                       vode_final_state_radiation_failure_tolerance_factor);
 
 
 }

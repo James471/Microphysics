@@ -136,7 +136,8 @@ template <typename BurnT, typename IntegratorT>
 AMREX_GPU_HOST_DEVICE AMREX_INLINE
 void integrator_cleanup (IntegratorT& int_state, BurnT& state,
                          int istate, const state_backup_t& state_save, amrex::Real dt,
-                         const amrex::Real final_state_species_failure_tolerance_factor = 1.0_rt)
+                         const amrex::Real final_state_species_failure_tolerance_factor = 1.0_rt,
+                         const amrex::Real final_state_radiation_failure_tolerance_factor = 1.0_rt)
 {
 
     // Copy the integration data back to the burn state.
