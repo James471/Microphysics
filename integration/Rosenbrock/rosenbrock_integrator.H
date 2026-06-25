@@ -187,13 +187,6 @@ bool species_change_valid (const rosenbrock_t<int_neqs>& rstate)
     constexpr amrex::Real decrease_change_factor = 0.25_rt;
 
     for (int i = 1; i <= NumSpec; ++i) {
-#ifdef PHOTOCHEMISTRY
-        // Skip rad flux
-        const int group_offset = (i - net_ienuc - 1);
-        if (group_offset >= 0 && group_offset % MicrophysicsNumRadVarsPerGroup != 0) {
-            continue;
-        }
-#endif
         if (std::abs(rstate.y(i)) > integrator_rp::X_reject_buffer * rstate.atol_spec &&
             std::abs(rstate.ynew(i)) > integrator_rp::X_reject_buffer * rstate.atol_spec &&
             (std::abs(rstate.ynew(i)) > increase_change_factor * std::abs(rstate.y(i)) ||
