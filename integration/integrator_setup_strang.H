@@ -150,6 +150,9 @@ void integrator_cleanup (IntegratorT& int_state, BurnT& state,
                          const amrex::Real final_state_species_failure_tolerance_factor = 1.0_rt,
                          const amrex::Real final_state_radiation_failure_tolerance_factor = 1.0_rt)
 {
+#ifndef PHOTOCHEMISTRY
+    amrex::ignore_unused(final_state_radiation_failure_tolerance_factor);
+#endif
 
     // Copy the integration data back to the burn state.
 
