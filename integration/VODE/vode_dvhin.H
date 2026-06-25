@@ -53,8 +53,10 @@ void dvhin (BurnT& state, DvodeT& vstate, amrex::Real& H0, int& NITER, int& IER)
             atol = vstate.atol_enuc;
         } else if ((i - NumSpec - 2) % MicrophysicsNumRadVarsPerGroup == 0) {
             atol = vstate.atol_rad_num;
+#ifndef SKIP_PHOTOCHEMFLUX
         } else {
             atol = 1.0e30_rt;  // flux: do not constrain initial step
+#endif
         }
 #else
         if (i <= NumSpec) {

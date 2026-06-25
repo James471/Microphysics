@@ -142,7 +142,9 @@ struct dvode_t
     amrex::Real rtol_enuc, atol_enuc;
 #ifdef PHOTOCHEMISTRY
     amrex::Real rtol_rad_num, atol_rad_num;
+#ifndef SKIP_PHOTOCHEMFLUX
     amrex::Real rtol_rad_flux, atol_rad_flux;
+#endif
 #endif
 
     // Local time and integration end time

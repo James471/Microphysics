@@ -44,10 +44,11 @@ IntegratorT integrator_setup (BurnT& state, amrex::Real dt, bool is_retry)
         int_state.rtol_enuc = integrator_rp::rtol_enuc; // energy generated
 #ifdef PHOTOCHEMISTRY
         int_state.atol_rad_num = integrator_rp::atol_rad_num; // radiation number density
-        int_state.atol_rad_flux = integrator_rp::atol_rad_flux; // radiation flux
-
         int_state.rtol_rad_num = integrator_rp::rtol_rad_num; // radiation number density
+#ifndef SKIP_PHOTOCHEMFLUX
+        int_state.atol_rad_flux = integrator_rp::atol_rad_flux; // radiation flux
         int_state.rtol_rad_flux = integrator_rp::rtol_rad_flux; // radiation flux
+#endif
 #endif
     } else {
         int_state.atol_spec = integrator_rp::retry_atol_spec > 0 ?
@@ -62,12 +63,14 @@ IntegratorT integrator_setup (BurnT& state, amrex::Real dt, bool is_retry)
 #ifdef PHOTOCHEMISTRY
         int_state.atol_rad_num = integrator_rp::retry_atol_rad_num > 0 ?
             integrator_rp::retry_atol_rad_num : integrator_rp::atol_rad_num; // radiation number density
-        int_state.atol_rad_flux = integrator_rp::retry_atol_rad_flux > 0 ?
-            integrator_rp::retry_atol_rad_flux : integrator_rp::atol_rad_flux; // radiation flux
         int_state.rtol_rad_num = integrator_rp::retry_rtol_rad_num > 0 ?
             integrator_rp::retry_rtol_rad_num : integrator_rp::rtol_rad_num; // radiation number density
+#ifndef SKIP_PHOTOCHEMFLUX
+        int_state.atol_rad_flux = integrator_rp::retry_atol_rad_flux > 0 ?
+            integrator_rp::retry_atol_rad_flux : integrator_rp::atol_rad_flux; // radiation flux
         int_state.rtol_rad_flux = integrator_rp::retry_rtol_rad_flux > 0 ?
             integrator_rp::retry_rtol_rad_flux : integrator_rp::rtol_rad_flux; // radiation flux
+#endif
 #endif
     }
 

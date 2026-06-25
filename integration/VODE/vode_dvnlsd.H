@@ -133,7 +133,7 @@ amrex::Real dvnlsd (int& NFLAG, BurnT& state, DvodeT& vstate)
 
             DEL = 0.0_rt;
             for (int i = 1; i <= int_neqs; ++i) {
-#ifdef PHOTOCHEMISTRY
+#if defined(PHOTOCHEMISTRY) && !defined(SKIP_PHOTOCHEMFLUX)
                 // skip radiation flux — passive scalar, one-way coupled
                 if (i > net_ienuc && (i - net_ienuc - 1) % MicrophysicsNumRadVarsPerGroup != 0) continue;
 #endif
