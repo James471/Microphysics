@@ -131,8 +131,8 @@ amrex::Real rtol_for (const RosenbrockT& rstate, const int n)
     }
 #ifdef PHOTOCHEMISTRY
     if (n > net_ienuc) {
-        const int group_offset = (n - net_ienuc - 1) % MicrophysicsNumRadVarsPerGroup;
 #ifndef SKIP_RAD_NUM_CONV
+        const int group_offset = (n - net_ienuc - 1) % MicrophysicsNumRadVarsPerGroup;
         return group_offset == 0 ? rstate.rtol_rad_num : 1.0e30;
 #else
         return 1.0e30;
@@ -151,8 +151,8 @@ amrex::Real atol_for (const RosenbrockT& rstate, const int n)
     }
 #ifdef PHOTOCHEMISTRY
     if (n > net_ienuc) {
-        const int group_offset = (n - net_ienuc - 1) % MicrophysicsNumRadVarsPerGroup;
 #ifndef SKIP_RAD_NUM_CONV
+        const int group_offset = (n - net_ienuc - 1) % MicrophysicsNumRadVarsPerGroup;
         return group_offset == 0 ? rstate.atol_rad_num : 1.0e30;
 #else
         return 1.0e30;
@@ -171,9 +171,9 @@ amrex::Real error_norm (const rosenbrock_t<int_neqs>& rstate)
         const amrex::Real sk = atol_for(rstate, n) +
             rtol_for(rstate, n) * amrex::max(std::abs(rstate.y(n)), std::abs(rstate.ynew(n)));
 #ifdef PHOTOCHEMISTRY
-    const int group_offset = (n - net_ienuc - 1) % MicrophysicsNumRadVarsPerGroup;
     amrex::Real term;
 #ifndef SKIP_RAD_NUM_CONV
+    const int group_offset = (n - net_ienuc - 1) % MicrophysicsNumRadVarsPerGroup;
     if (n > net_ienuc && group_offset != 0) {
 #else
     if (n > net_ienuc) {
