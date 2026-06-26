@@ -84,11 +84,11 @@ int dvode (BurnT& state, DvodeT& vstate)
 #ifdef PHOTOCHEMISTRY
     for (int i = 1; i <= NumChemBands; ++i) {
         int rad_n_index = NumSpec + 2 + (i-1) * MicrophysicsNumRadVarsPerGroup;
-#ifdef RAD_NUM_IN_CONVERGENCE
+#ifndef SKIP_RAD_NUM_CONV
         vstate.ewt(rad_n_index) = vstate.rtol_rad_num * std::abs(vstate.yh(rad_n_index,1)) + vstate.atol_rad_num;
         vstate.ewt(rad_n_index) = 1.0_rt / vstate.ewt(rad_n_index);
 #else
-        // Radiation number density: excluded from convergence — passive when RAD_NUM_IN_CONVERGENCE is not defined.
+        // Radiation number density: excluded from convergence — passive when SKIP_RAD_NUM_CONV is defined.
         vstate.ewt(rad_n_index) = 0.0_rt;
 #endif
 #ifndef SKIP_PHOTOCHEMFLUX
@@ -176,11 +176,11 @@ int dvode (BurnT& state, DvodeT& vstate)
 #ifdef PHOTOCHEMISTRY
             for (int i = 1; i <= NumChemBands; ++i) {
                 int rad_n_index = NumSpec + 2 + (i-1) * MicrophysicsNumRadVarsPerGroup;
-#ifdef RAD_NUM_IN_CONVERGENCE
+#ifndef SKIP_RAD_NUM_CONV
                 vstate.ewt(rad_n_index) = vstate.rtol_rad_num * std::abs(vstate.yh(rad_n_index,1)) + vstate.atol_rad_num;
                 vstate.ewt(rad_n_index) = 1.0_rt / vstate.ewt(rad_n_index);
 #else
-                // Radiation number density: excluded from convergence — passive when RAD_NUM_IN_CONVERGENCE is not defined.
+                // Radiation number density: excluded from convergence — passive when SKIP_RAD_NUM_CONV is defined.
                 vstate.ewt(rad_n_index) = 0.0_rt;
 #endif
 #ifndef SKIP_PHOTOCHEMFLUX
