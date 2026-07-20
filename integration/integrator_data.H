@@ -10,7 +10,7 @@
 #ifndef PHOTOCHEMISTRY
 constexpr int INT_NEQS = NumSpec + 1;
 #else
-constexpr int INT_NEQS = NumRadEqs + NumSpec + 1;
+constexpr int INT_NEQS = NumChemRadEqs + NumThermalBands + NumSpec + 1;
 #endif
 
 
@@ -46,7 +46,7 @@ constexpr int integrator_neqs ()
     if constexpr (has_xn<BurnT>) {
         int_neqs += NumSpec;
 #ifdef PHOTOCHEMISTRY
-        int_neqs += NumRadEqs;
+        int_neqs += NumChemRadEqs + NumThermalBands;
 #endif
     }
 
@@ -56,7 +56,7 @@ constexpr int integrator_neqs ()
 #else
     int_neqs = NumSpec + 1;
 #ifdef PHOTOCHEMISTRY
-    int_neqs += NumRadEqs;
+    int_neqs += NumChemRadEqs + NumThermalBands;
 #endif
 #endif
 

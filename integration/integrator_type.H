@@ -59,8 +59,11 @@ void update_thermodynamics (BurnT& state, const I& int_state)
     }
     state.e = int_state.y(net_ienuc);
 #ifdef PHOTOCHEMISTRY
-    for (int n = 1; n <= NumRadEqs; ++n) {
+    for (int n = 1; n <= NumChemRadEqs; ++n) {
         state.rn[n-1] = int_state.y(net_ienuc + n);
+    }
+    for (int n = 1; n <= NumThermalBands; ++n) {
+        state.re_thermal[n-1] = int_state.y(net_ienuc + NumChemRadEqs + n);
     }
     state.c_hat = int_state.c_hat;
 #endif

@@ -15,7 +15,8 @@ struct eos_t:eos_base_t {
     amrex::Real s{};
     amrex::Real xn[NumSpec]{};
 #ifdef PHOTOCHEMISTRY
-    amrex::Real rn[NumRadEqs]{};
+    amrex::Real rn[NumChemRadEqs]{};
+    amrex::Real re_thermal[NumThermalBands]{};
     amrex::Real c_hat{};
 #endif
 #if NAUX_NET > 0
@@ -63,7 +64,8 @@ struct eos_re_t:eos_base_t {
     amrex::Real e{};
     amrex::Real xn[NumSpec]{};
 #ifdef PHOTOCHEMISTRY
-    amrex::Real rn[NumRadEqs]{};
+    amrex::Real rn[NumChemRadEqs]{};
+    amrex::Real re_thermal[NumThermalBands]{};
     amrex::Real c_hat{};
 #endif
 #if NAUX_NET > 0
@@ -98,7 +100,8 @@ struct eos_rep_t:eos_base_t {
     amrex::Real aux[NumAux]{};
 #endif
 #ifdef PHOTOCHEMISTRY
-    amrex::Real rn[NumRadEqs]{};
+    amrex::Real rn[NumChemRadEqs]{};
+    amrex::Real re_thermal[NumThermalBands]{};
     amrex::Real c_hat{};
 #endif
     amrex::Real dedT{};
@@ -242,8 +245,13 @@ std::ostream& print_state (std::ostream& o, T const& eos_state)
 #endif
 #ifdef PHOTOCHEMISTRY
         o << "rn = ";
-        for (int n = 0; n < NumRadEqs; ++n) {
+        for (int n = 0; n < NumChemRadEqs; ++n) {
             o << eos_state.rn[n] << " ";
+        }
+        o << std::endl;
+        o << "re_thermal = ";
+        for (int n = 0; n < NumThermalBands; ++n) {
+            o << eos_state.re_thermal[n] << " ";
         }
         o << std::endl;
         o << "c_hat = " << eos_state.c_hat << std::endl;

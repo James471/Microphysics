@@ -218,8 +218,13 @@ void print_state (T& state) {
   std::cout << std::endl;
 #ifdef PHOTOCHEMISTRY
   std::cout << "RAD = ";
-  for (int n = 0; n < NumRadEqs; n ++) {
+  for (int n = 0; n < NumChemRadEqs; n ++) {
     std::cout << state.rn[n] << " ";
+  }
+  std::cout << std::endl;
+  std::cout << "RAD_THERMAL = ";
+  for (int n = 0; n < NumThermalBands; n ++) {
+    std::cout << state.re_thermal[n] << " ";
   }
   std::cout << std::endl;
 #endif
