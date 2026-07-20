@@ -147,6 +147,50 @@ function(setup_target_for_microphysics_compilation network_name output_dir)
     execute_process(COMMAND ${CMAKE_COMMAND} -E env "PYTHONPATH=${PYTHONPATH}:${CMAKE_CURRENT_FUNCTION_LIST_DIR}/networks/general_null" python3 "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/networks/get_naux.py" --net "${networkdir}" --microphysics_path "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/" WORKING_DIRECTORY ${output_dir}/)
     execute_process(COMMAND python3 "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/networks/general_null/write_network.py" --header_template "${networkheadertemplatefile}" --header_output "${networkpropfile}" -s "${networkfile}" WORKING_DIRECTORY ${output_dir}/)
 
+  elseif (${network_name} STREQUAL "3band")
+    # Same species/EOS as 'photoionization' (electron, H, H+); reuses its EOS directory. The
+    # network RHS/Jacobian differ (mixed thermal + chemically-active radiation bands), living in
+    # src/networks/3band/ instead of src/networks/photoionization/.
+    #need these to write extern_parameters.H
+    set(paramfile "${CMAKE_CURRENT_LIST_DIR}/_parameters")
+    set(EOSparamfile "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/EOS/photoionization/_parameters")
+    set(networkpcparamfile "${CMAKE_SOURCE_DIR}/src/networks/3band/_parameters")
+
+    #similarly, we want network_properties.H
+    set(networkpropfile "${output_dir}/network_properties.H")
+    set(networkdir "${CMAKE_SOURCE_DIR}/src/networks/3band/")
+    set(networkheadertemplatefile "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/networks/general_null/network_header.template")
+
+    #DO NOT change the order of the directories below!
+    set (photoionization_dirs ${CMAKE_BINARY_DIR} ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/util ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/util/gcem/include
+                             ${integrator_dir} ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/integration/utils
+                             ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/integration ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/interfaces
+                             ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/EOS ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/EOS/photoionization
+                             ${CMAKE_SOURCE_DIR}/src/networks/3band ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/networks
+                             ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/constants
+                             PARENT_SCOPE)
+
+    if(BUILD_UNIT_TEST_PC)
+      message(STATUS "In BUILD_UNIT_TEST_PC")
+      execute_process(COMMAND python3 "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/util/build_scripts/write_probin.py" --pa "${paramfile} ${EOSparamfile}
+                      ${networkpcparamfile} ${networkparamfile} ${integratorparamfile} ${integrationparamfile} ${unittestparamfile}" --use_namespace WORKING_DIRECTORY ${output_dir}/)
+    else()
+      message(STATUS "Not in BUILD_UNIT_TEST_PC")
+      #do not need paramfile and unittestparamfile
+      execute_process(COMMAND python3 "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/util/build_scripts/write_probin.py" --pa "${EOSparamfile} ${networkpcparamfile}
+                      ${networkparamfile} ${integratorparamfile} ${integrationparamfile} " --use_namespace WORKING_DIRECTORY ${output_dir}/)
+    endif()
+
+    set(photoionization_sources ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/interfaces/eos_data.cpp
+                                ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/interfaces/network_initialization.cpp
+                                ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/EOS/photoionization/actual_eos_data.cpp
+                                ${CMAKE_SOURCE_DIR}/src/networks/3band/actual_network_data.cpp
+                                ${output_dir}/extern_parameters.cpp PARENT_SCOPE)
+
+    #below for NAUX
+    execute_process(COMMAND ${CMAKE_COMMAND} -E env "PYTHONPATH=${PYTHONPATH}:${CMAKE_CURRENT_FUNCTION_LIST_DIR}/networks/general_null" python3 "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/networks/get_naux.py" --net "${networkdir}" --microphysics_path "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/" WORKING_DIRECTORY ${output_dir}/)
+    execute_process(COMMAND python3 "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/networks/general_null/write_network.py" --header_template "${networkheadertemplatefile}" --header_output "${networkpropfile}" -s "${networkfile}" WORKING_DIRECTORY ${output_dir}/)
+
   elseif (${network_name} STREQUAL "metal_chem")
     #need these to write extern_parameters.H
     set(paramfile "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/unit_test/burn_cell_metal_chem/_parameters")
@@ -195,7 +239,7 @@ function(setup_target_for_microphysics_compilation network_name output_dir)
     execute_process(COMMAND python3 "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/networks/general_null/write_network.py" --header_template "${networkheadertemplatefile}" --header_output "${networkpropfile}" -s "${networkfile}" WORKING_DIRECTORY ${output_dir}/)
 
   else()
-    message(FATAL_ERROR "Given network_name " ${network_name} " currently not supported. Use either 'gamma_law' or 'primordial_chem' or 'metal_chem' ")
+    message(FATAL_ERROR "Given network_name " ${network_name} " currently not supported. Use either 'gamma_law' or 'primordial_chem' or 'photoionization' or '3band' or 'metal_chem' ")
 
   endif()
 
