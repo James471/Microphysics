@@ -21,7 +21,8 @@ struct state_backup_t {
 #ifndef AMREX_USE_GPU
     amrex::Real xn_in[NumSpec]{};
 #ifdef PHOTOCHEMISTRY
-    amrex::Real rn_in[NumRadEqs]{};
+    amrex::Real rn_in[NumChemRadEqs]{};
+    amrex::Real re_thermal_in[NumThermalBands]{};
     amrex::Real c_hat;
 #endif
 #endif
@@ -129,8 +130,11 @@ state_backup_t integrator_backup (const BurnT& state) {
         state_save.xn_in[n] = state.xn[n];
     }
 #ifdef PHOTOCHEMISTRY
-    for (int n = 0; n < NumRadEqs; ++n) {
+    for (int n = 0; n < NumChemRadEqs; ++n) {
         state_save.rn_in[n] = state.rn[n];
+    }
+    for (int n = 0; n < NumThermalBands; ++n) {
+        state_save.re_thermal_in[n] = state.re_thermal[n];
     }
     state_save.c_hat = state.c_hat;
 #endif
@@ -208,7 +212,7 @@ void integrator_cleanup (IntegratorT& int_state, BurnT& state,
     const amrex::Real final_state_radiation_failure_tolerance =
         final_state_radiation_failure_tolerance_factor * integrator_rp::radiation_failure_tolerance;
 
-    for (int n = net_ienuc+1; n <= net_ienuc+NumRadEqs; n += MicrophysicsNumRadVarsPerGroup) {
+    for (int n = net_ienuc+1; n <= net_ienuc+NumChemRadEqs; n += MicrophysicsNumChemRadVarsPerGroup) {
         if (int_state.y(n) < -final_state_radiation_failure_tolerance) {
             state.success = false;
         }
@@ -249,6 +253,11 @@ void integrator_cleanup (IntegratorT& int_state, BurnT& state,
         for (const double X : state_save.rn_in) {
             std::cout << std::scientific << std::setprecision(OUTDIGITS) << X << " ";
         }
+        std::cout << std::endl;
+        std::cout << "re_thermal start = ";
+        for (const double X : state_save.re_thermal_in) {
+            std::cout << std::scientific << std::setprecision(OUTDIGITS) << X << " ";
+        }
 #endif
         std::cout << std::endl;
         std::cout << "dens current = " << std::setprecision(OUTDIGITS) << state.rho << std::endl;
@@ -261,6 +270,11 @@ void integrator_cleanup (IntegratorT& int_state, BurnT& state,
         std::cout << std::endl;
         std::cout << "rn current = ";
         for (const double X : state.rn) {
+            std::cout << std::scientific << std::setprecision(OUTDIGITS) << X << " ";
+        }
+        std::cout << std::endl;
+        std::cout << "re_thermal current = ";
+        for (const double X : state.re_thermal) {
             std::cout << std::scientific << std::setprecision(OUTDIGITS) << X << " ";
         }
 #endif

@@ -122,6 +122,22 @@ RArray1D& stage_vector (rosenbrock_t<int_neqs>& rstate, const int i)
     return rstate.work;
 }
 
+#ifdef PHOTOCHEMISTRY
+// y(n) for n in (net_ienuc, net_ienuc+NumChemRadEqs] is a chem band's (photon number density, flux
+// factor) pair; only the photon-number slot (group_offset == 0) participates in error control.
+// y(n) for n in (net_ienuc+NumChemRadEqs, net_ienuc+NumChemRadEqs+NumThermalBands] is a thermal band's
+// energy density (re_thermal[], no paired flux slot) -- always excluded from error control
+AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
+bool rad_eq_in_error_control (const int n)
+{
+    if (n > net_ienuc + NumChemRadEqs) {
+        return false;
+    }
+    const int group_offset = (n - net_ienuc - 1) % MicrophysicsNumChemRadVarsPerGroup;
+    return group_offset == 0;
+}
+#endif
+
 template <typename RosenbrockT>
 AMREX_GPU_HOST_DEVICE AMREX_FORCE_INLINE
 amrex::Real rtol_for (const RosenbrockT& rstate, const int n)
@@ -131,8 +147,7 @@ amrex::Real rtol_for (const RosenbrockT& rstate, const int n)
     }
 #ifdef PHOTOCHEMISTRY
     if (n > net_ienuc) {
-        const int group_offset = (n - net_ienuc - 1) % MicrophysicsNumRadVarsPerGroup;
-        return group_offset == 0 ? rstate.rtol_rad_num : 1.0e30;
+        return rad_eq_in_error_control(n) ? rstate.rtol_rad_num : 1.0e30;
     }
 #endif
     return rstate.rtol_spec;
@@ -147,8 +162,7 @@ amrex::Real atol_for (const RosenbrockT& rstate, const int n)
     }
 #ifdef PHOTOCHEMISTRY
     if (n > net_ienuc) {
-        const int group_offset = (n - net_ienuc - 1) % MicrophysicsNumRadVarsPerGroup;
-        return group_offset == 0 ? rstate.atol_rad_num : 1.0e30;
+        return rad_eq_in_error_control(n) ? rstate.atol_rad_num : 1.0e30;
     }
 #endif
     return rstate.atol_spec;
@@ -163,9 +177,8 @@ amrex::Real error_norm (const rosenbrock_t<int_neqs>& rstate)
         const amrex::Real sk = atol_for(rstate, n) +
             rtol_for(rstate, n) * amrex::max(std::abs(rstate.y(n)), std::abs(rstate.ynew(n)));
 #ifdef PHOTOCHEMISTRY
-    const int group_offset = (n - net_ienuc - 1) % MicrophysicsNumRadVarsPerGroup;
     amrex::Real term;
-    if (n > net_ienuc && group_offset != 0) {
+    if (n > net_ienuc && !rad_eq_in_error_control(n)) {
         term = 0.0_rt;
     } else {
         term = rstate.work(n) / sk;
@@ -238,7 +251,7 @@ bool valid_integrator_state (const amrex::Array1D<amrex::Real, 1, int_neqs>& y)
     }
 
 #ifdef PHOTOCHEMISTRY
-    for (int n = net_ienuc+1; n <= net_ienuc+NumRadEqs; n += MicrophysicsNumRadVarsPerGroup) {
+    for (int n = net_ienuc+1; n <= net_ienuc+NumChemRadEqs; n += MicrophysicsNumChemRadVarsPerGroup) {
         if (y(n) < -integrator_rp::atol_rad_num) {
             return false;
         }

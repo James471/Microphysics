@@ -302,7 +302,7 @@ int dvstep (BurnT& state, DvodeT& vstate)
         }
 
 #ifdef PHOTOCHEMISTRY
-        for (int i = net_ienuc + 1; i <= int_neqs; i+=MicrophysicsNumRadVarsPerGroup) {
+        for (int i = net_ienuc + 1; i <= int_neqs; i+=MicrophysicsNumChemRadVarsPerGroup) {
 
 #ifdef STRANG
             // Constrain radiation quantities such that they don't change by more than a certain

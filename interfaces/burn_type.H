@@ -25,7 +25,7 @@ using namespace network_rp;
 // evolving.  For simplified-SDC, we will need neqs when getting the
 // reaction sources from the network's RHS.
 #if defined (PHOTOCHEMISTRY)
-const int neqs = 1 + NumSpec + NumRadEqs;
+const int neqs = 1 + NumSpec + NumChemRadEqs + NumThermalBands;
 #else
 const int neqs = 1 + NumSpec;
 #endif
@@ -48,7 +48,7 @@ using YdotNetArray1D = amrex::Array1D<amrex::Real, 1, neqs>;
 
 const int SFS   = 0;
 #if defined (PHOTOCHEMISTRY)
-const int SEINT = NumSpec + NumRadEqs;
+const int SEINT = NumSpec + NumChemRadEqs + NumThermalBands;
 #else
 const int SEINT = NumSpec;
 #endif
@@ -91,7 +91,8 @@ struct burn_t
   amrex::Real aux[NumAux]{};
 #endif
 #ifdef PHOTOCHEMISTRY
-  amrex::Real rn[NumRadEqs]{};
+  amrex::Real rn[NumChemRadEqs]{}; // chem bands only: (photon number density, flux-attenuation factor) pairs
+  amrex::Real re_thermal[NumThermalBands]{}; // thermal bands only: energy density, no flux (isotropic, no net flux)
   amrex::Real c_hat{};
 #endif
 
@@ -191,6 +192,10 @@ std::ostream& operator<< (std::ostream& o, burn_t const& burn_state)
   for (double Rn : burn_state.rn) {
     o << Rn << " ";
   }
+  o << "re_thermal = ";
+  for (double Re : burn_state.re_thermal) {
+    o << Re << " ";
+  }
 #endif
   o << std::endl;
   o << "(i, j, k) = " << burn_state.i << " " << burn_state.j << " " << burn_state.k << std::endl;
@@ -257,8 +262,11 @@ void eos_to_burn (const T& eos_state, BurnT& burn_state)
     }
 #endif
 #ifdef PHOTOCHEMISTRY
-    for (int n = 0; n < NumRadEqs; ++n) {
+    for (int n = 0; n < NumChemRadEqs; ++n) {
         burn_state.rn[n] = eos_state.rn[n];
+    }
+    for (int n = 0; n < NumThermalBands; ++n) {
+        burn_state.re_thermal[n] = eos_state.re_thermal[n];
     }
     burn_state.c_hat = eos_state.c_hat;
 #endif
@@ -301,8 +309,11 @@ void burn_to_eos (const BurnT& burn_state, T& eos_state)
 #endif
 
 #ifdef PHOTOCHEMISTRY
-    for (int n = 0; n < NumRadEqs; ++n) {
+    for (int n = 0; n < NumChemRadEqs; ++n) {
         eos_state.rn[n] = burn_state.rn[n];
+    }
+    for (int n = 0; n < NumThermalBands; ++n) {
+        eos_state.re_thermal[n] = burn_state.re_thermal[n];
     }
     eos_state.c_hat = burn_state.c_hat;
 #endif

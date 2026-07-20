@@ -97,7 +97,7 @@ void nonaka_rhs(const amrex::Real time, const BurnT& state, const YdotNetArray1D
             nf << std::setw(FIELD_WIDTH) << state.xn[n] << " ";
         }
 #ifdef PHOTOCHEMISTRY
-        for (int n = 0; n < NumRadEqs; ++n) {
+        for (int n = 0; n < NumChemRadEqs; ++n) {
             nf << std::setw(FIELD_WIDTH) << state.rn[n] << " ";
         }
 #endif

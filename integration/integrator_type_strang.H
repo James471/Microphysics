@@ -19,8 +19,11 @@ void integrator_to_burn (const I& int_state, BurnT& state)
     state.e = int_state.y(net_ienuc);
 
 #ifdef PHOTOCHEMISTRY
-    for (int n = 1; n <= NumRadEqs; ++n) {
+    for (int n = 1; n <= NumChemRadEqs; ++n) {
         state.rn[n-1] = int_state.y(net_ienuc + n);
+    }
+    for (int n = 1; n <= NumThermalBands; ++n) {
+        state.re_thermal[n-1] = int_state.y(net_ienuc + NumChemRadEqs + n);
     }
     state.c_hat = int_state.c_hat;
 #endif
@@ -46,8 +49,11 @@ void burn_to_integrator (const BurnT& state, I& int_state)
     int_state.y(net_ienuc) = state.e;
 
 #ifdef PHOTOCHEMISTRY
-    for (int n = 1; n <= NumRadEqs; ++n) {
+    for (int n = 1; n <= NumChemRadEqs; ++n) {
         int_state.y(net_ienuc + n) = state.rn[n-1];
+    }
+    for (int n = 1; n <= NumThermalBands; ++n) {
+        int_state.y(net_ienuc + NumChemRadEqs + n) = state.re_thermal[n-1];
     }
     int_state.c_hat = state.c_hat;
 #endif
@@ -80,7 +86,10 @@ void clean_state (const amrex::Real time, BurnT& state, I& int_state)
         }
     }
 #ifdef PHOTOCHEMISTRY
-    for (int n = net_ienuc+1; n <= net_ienuc+NumRadEqs; n += MicrophysicsNumRadVarsPerGroup) {
+    for (int n = net_ienuc+1; n <= net_ienuc+NumChemRadEqs; n += MicrophysicsNumChemRadVarsPerGroup) {
+        int_state.y(n) = amrex::max(int_state.y(n), integrator_rp::SMALL_X_SAFE);
+    }
+    for (int n = net_ienuc+NumChemRadEqs+1; n <= net_ienuc+NumChemRadEqs+NumThermalBands; ++n) {
         int_state.y(n) = amrex::max(int_state.y(n), integrator_rp::SMALL_X_SAFE);
     }
 #endif
