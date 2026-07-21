@@ -105,11 +105,11 @@ function(setup_target_for_microphysics_compilation network_name output_dir)
     set(EOSparamfile "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/EOS/photoionization/_parameters")
     set(networkpcparamfile "${CMAKE_SOURCE_DIR}/src/networks/photoionization/_parameters")
 
-    #similarly, we want network_properties.H
-    set(networkpropfile "${output_dir}/network_properties.H")
-    # set(networkfile "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/networks/primordial_chem/pynucastro.net")
-    set(networkdir "${CMAKE_SOURCE_DIR}/src/networks/photoionization/")
-    set(networkheadertemplatefile "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/networks/general_null/network_header.template")
+    # network_properties.H for photoionization is not generated from a .net
+    # file via write_network.py -- each problem's own CMakeLists.txt writes
+    # it directly (via configure_file of network_header.template) with
+    # hand-specified species, since there is no general_null-style .net file
+    # for this network.
 
     #DO NOT change the order of the directories below!
     set (photoionization_dirs ${CMAKE_BINARY_DIR} ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/util ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/util/gcem/include
@@ -143,9 +143,9 @@ function(setup_target_for_microphysics_compilation network_name output_dir)
                                 ${CMAKE_SOURCE_DIR}/src/networks/photoionization/actual_network_data.cpp
                                 ${output_dir}/extern_parameters.cpp PARENT_SCOPE)
 
-    #below for NAUX
-    execute_process(COMMAND ${CMAKE_COMMAND} -E env "PYTHONPATH=${PYTHONPATH}:${CMAKE_CURRENT_FUNCTION_LIST_DIR}/networks/general_null" python3 "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/networks/get_naux.py" --net "${networkdir}" --microphysics_path "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/" WORKING_DIRECTORY ${output_dir}/)
-    execute_process(COMMAND python3 "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/networks/general_null/write_network.py" --header_template "${networkheadertemplatefile}" --header_output "${networkpropfile}" -s "${networkfile}" WORKING_DIRECTORY ${output_dir}/)
+    # NAUX for photoionization is always 0 (fixed via NAUX_NET compile
+    # definition), so get_naux.py is not needed here -- unlike
+    # primordial_chem/metal_chem, there is no .net file for it to read.
 
   elseif (${network_name} STREQUAL "metal_chem")
     #need these to write extern_parameters.H
