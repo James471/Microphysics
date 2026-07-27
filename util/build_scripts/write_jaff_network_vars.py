@@ -69,7 +69,7 @@ def parse_bands_ev(jaff_toml_file: Path) -> list[float]:
     with jaff_toml_file.open("rb") as f:
         config = tomllib.load(f)
 
-    bands_ev = config["radiation"]["bands"]
+    bands_ev = config["network"]["radiation"]["bands"]
 
     for edge in bands_ev:
         if isinstance(edge, str):
