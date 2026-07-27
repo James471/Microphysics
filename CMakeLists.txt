@@ -99,11 +99,11 @@ function(setup_target_for_microphysics_compilation network_name output_dir)
     execute_process(COMMAND ${CMAKE_COMMAND} -E env "PYTHONPATH=${PYTHONPATH}:${CMAKE_CURRENT_FUNCTION_LIST_DIR}/networks/general_null" python3 "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/networks/get_naux.py" --net "${networkdir}" --microphysics_path "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/" WORKING_DIRECTORY ${output_dir}/)
     execute_process(COMMAND python3 "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/networks/general_null/write_network.py" --header_template "${networkheadertemplatefile}" --header_output "${networkpropfile}" -s "${networkfile}" WORKING_DIRECTORY ${output_dir}/)
 
-  elseif (${network_name} STREQUAL "photoionization")
+  elseif (${network_name} STREQUAL "photoionization" OR ${network_name} STREQUAL "photoionization_jaff")
     #need these to write extern_parameters.H
     set(paramfile "${CMAKE_CURRENT_LIST_DIR}/_parameters")
     set(EOSparamfile "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/EOS/photoionization/_parameters")
-    set(networkpcparamfile "${CMAKE_SOURCE_DIR}/src/networks/photoionization/_parameters")
+    set(networkpcparamfile "${CMAKE_SOURCE_DIR}/src/networks/${network_name}/_parameters")
 
     # network_properties.H for photoionization is not generated from a .net
     # file via write_network.py -- each problem's own CMakeLists.txt writes
@@ -116,7 +116,7 @@ function(setup_target_for_microphysics_compilation network_name output_dir)
                              ${integrator_dir} ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/integration/utils
                              ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/integration ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/interfaces
                              ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/EOS ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/EOS/photoionization
-                             ${CMAKE_SOURCE_DIR}/src/networks/photoionization ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/networks
+                             ${CMAKE_SOURCE_DIR}/src/networks/${network_name} ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/networks
                              ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/constants
                              PARENT_SCOPE)
 
@@ -146,6 +146,27 @@ function(setup_target_for_microphysics_compilation network_name output_dir)
     # NAUX for photoionization is always 0 (fixed via NAUX_NET compile
     # definition), so get_naux.py is not needed here -- unlike
     # primordial_chem/metal_chem, there is no .net file for it to read.
+
+    if (${network_name} STREQUAL "photoionization_jaff")
+      # jaff's own _parameters (species_N_name) and jaffgen.toml ([radiation].bands)
+      # already carry the network's species order/names and radiation band
+      # edges; derive NSPEC/SPECIES_ENUM/SPEC_NAMES/NUM_CHEM_BANDS/CHEM_BANDS
+      # from them here instead of having every problem's CMakeLists.txt
+      # hand-duplicate the same list and risk disagreeing with jaff's own
+      # species order (which is what state.xn[] positions in actual_rhs.H
+      # actually correspond to).
+      set(jaff_network_vars_file "${output_dir}/jaff_network_vars.cmake")
+      execute_process(COMMAND python3 "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/util/build_scripts/write_jaff_network_vars.py"
+                      --network-parameters "${networkpcparamfile}"
+                      --jaff-toml "${CMAKE_SOURCE_DIR}/src/networks/${network_name}/jaffgen.toml"
+                      --output "${jaff_network_vars_file}"
+                      WORKING_DIRECTORY ${output_dir}/
+                      RESULT_VARIABLE jaff_network_vars_result)
+      if (NOT jaff_network_vars_result EQUAL 0)
+        message(FATAL_ERROR "write_jaff_network_vars.py failed for network ${network_name}")
+      endif()
+      set(jaff_network_vars_file "${jaff_network_vars_file}" PARENT_SCOPE)
+    endif()
 
   elseif (${network_name} STREQUAL "metal_chem")
     #need these to write extern_parameters.H
