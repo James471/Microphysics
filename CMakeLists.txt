@@ -99,7 +99,7 @@ function(setup_target_for_microphysics_compilation network_name output_dir)
     execute_process(COMMAND ${CMAKE_COMMAND} -E env "PYTHONPATH=${PYTHONPATH}:${CMAKE_CURRENT_FUNCTION_LIST_DIR}/networks/general_null" python3 "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/networks/get_naux.py" --net "${networkdir}" --microphysics_path "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/" WORKING_DIRECTORY ${output_dir}/)
     execute_process(COMMAND python3 "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/networks/general_null/write_network.py" --header_template "${networkheadertemplatefile}" --header_output "${networkpropfile}" -s "${networkfile}" WORKING_DIRECTORY ${output_dir}/)
 
-  elseif (${network_name} STREQUAL "photoionization" OR ${network_name} STREQUAL "photoionization_jaff")
+  elseif (${network_name} STREQUAL "photoionization" OR ${network_name} STREQUAL "photoionization_jaff" OR ${network_name} STREQUAL "dtype_photoionization_jaff")
     #need these to write extern_parameters.H
     set(paramfile "${CMAKE_CURRENT_LIST_DIR}/_parameters")
     set(EOSparamfile "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/EOS/photoionization/_parameters")
@@ -147,7 +147,7 @@ function(setup_target_for_microphysics_compilation network_name output_dir)
     # definition), so get_naux.py is not needed here -- unlike
     # primordial_chem/metal_chem, there is no .net file for it to read.
 
-    if (${network_name} STREQUAL "photoionization_jaff")
+    if (${network_name} STREQUAL "photoionization_jaff" OR ${network_name} STREQUAL "dtype_photoionization_jaff")
       # jaff's own _parameters (species_N_name) and jaffgen.toml ([radiation].bands)
       # already carry the network's species order/names and radiation band
       # edges; derive NSPEC/SPECIES_ENUM/SPEC_NAMES/NUM_CHEM_BANDS/CHEM_BANDS
