@@ -111,6 +111,18 @@ void jac (const amrex::Real time, BurnT& state, T& int_state, MatrixType& pd)
 
     // Call the specific network routine to get the Jacobian.
 
+    // LOCAL PATCH (not upstreamed): pd is a caller-owned scratch buffer (a
+    // plain, non-zero-initialized C array under the hood) that may be reused
+    // across calls, so any entry a network's jac routine doesn't explicitly
+    // assign would otherwise retain a stale value from a previous call. Some
+    // networks (e.g. the hand-written photoionization one) defensively zero
+    // it themselves; others (jaff-generated ones) only assign the nonzero
+    // entries and rely on the buffer already being clean. Per jaff's own
+    // design position, this buffer's lifecycle is the parent code's
+    // responsibility, not the network's -- so zero it here, unconditionally,
+    // before every network's jac routine runs.
+    pd.zero();
+
     actual_jac(state, pd);
 
     // The Jacobian from the nets is in terms of dYdot/dY, but we want
