@@ -19,12 +19,19 @@ Radiation band edges come from the network's jaff.toml [radiation].bands
 list and are passed through in eV, jaff's native unit for this -- Quokka's
 own C++ side (RadSystem::GetChemBandQuanta) is responsible for converting
 eV to erg/Hz/whatever it needs, so this script never has to know about or
-convert to Quokka's internal units.
+convert to Quokka's internal units. An open upper edge ("inf" in the TOML,
+matching jaff's own sentinel) is passed through as the C++ double infinity
+literal so the band array stays a plain fixed-size GpuArray.
+
+[radiation].power_law_index (jaff's photon-number spectrum index alpha, in
+n(E) ~ E^(alpha-2)) is passed through unchanged so GetChemBandQuanta can
+reproduce jaff's own band-average-energy weighting instead of assuming a
+flat spectrum.
 
 Output is written as a small CMake include file that sets NSPEC,
-SPECIES_ENUM, SPEC_NAMES, NUM_CHEM_BANDS, and CHEM_BANDS, meant to be
-include()-d by a problem's CMakeLists.txt before configure_file() of
-network_header.template.
+SPECIES_ENUM, SPEC_NAMES, NUM_CHEM_BANDS, CHEM_BANDS, and
+POWER_LAW_INDEX, meant to be include()-d by a problem's CMakeLists.txt
+before configure_file() of network_header.template.
 """
 
 from __future__ import annotations
@@ -71,13 +78,25 @@ def parse_bands_ev(jaff_toml_file: Path) -> list[float]:
 
     bands_ev = config["network"]["radiation"]["bands"]
 
-    for edge in bands_ev:
+    parsed: list[float] = []
+    for i, edge in enumerate(bands_ev):
         if isinstance(edge, str):
+            if edge == "inf" and i == len(bands_ev) - 1:
+                parsed.append(float("inf"))
+                continue
             raise ValueError(
-                f"{jaff_toml_file}: non-numeric band edge {edge!r}; use a "
-                "finite eV cutoff instead"
+                f"{jaff_toml_file}: non-numeric band edge {edge!r}; only "
+                '"inf" as the last edge is supported'
             )
-    return bands_ev
+        parsed.append(float(edge))
+    return parsed
+
+
+def parse_power_law_index(jaff_toml_file: Path) -> float:
+    with jaff_toml_file.open("rb") as f:
+        config = tomllib.load(f)
+
+    return float(config["network"]["radiation"]["power_law_index"])
 
 
 def main() -> None:
@@ -112,7 +131,11 @@ def main() -> None:
 
     bands_ev = parse_bands_ev(args.jaff_toml)
     num_chem_bands = len(bands_ev) - 1
-    chem_bands = ", ".join(f"{edge:.6e}" for edge in bands_ev)
+    chem_bands = ", ".join(
+        "std::numeric_limits<double>::infinity()" if edge == float("inf") else f"{edge:.6e}"
+        for edge in bands_ev
+    )
+    power_law_index = parse_power_law_index(args.jaff_toml)
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(
@@ -122,6 +145,7 @@ def main() -> None:
         f'set(SPEC_NAMES\n"{spec_names}"\n)\n'
         f"set(NUM_CHEM_BANDS {num_chem_bands})\n"
         f'set(CHEM_BANDS "{chem_bands}") # eV\n'
+        f"set(POWER_LAW_INDEX {power_law_index:.6e}) # jaff network.radiation.power_law_index\n"
     )
 
 
