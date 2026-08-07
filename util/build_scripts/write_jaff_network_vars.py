@@ -48,6 +48,10 @@ except ImportError:
 
 VALID_CXX_IDENTIFIER = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
+# 1 atomic mass unit in grams; jaff writes species_N_mass in grams, while
+# aion[] is conventionally in amu.
+AMU_IN_GRAMS = 1.66053906660e-24
+
 
 def parse_species_names(parameters_file):
     pattern = re.compile(r'^species_(\d+)_name\s+string\s+"(.*)"\s*$')
@@ -59,6 +63,44 @@ def parse_species_names(parameters_file):
     if not entries:
         raise RuntimeError(f"no species_N_name entries found in {parameters_file}")
     return [entries[i] for i in sorted(entries)]
+
+
+def parse_species_masses_g(parameters_file):
+    """Species masses in grams, in jaff's own species order."""
+    pattern = re.compile(r"^species_(\d+)_mass\s+real\s+(\S+)\s*$")
+    entries = {}
+    for line in parameters_file.read_text().splitlines():
+        m = pattern.match(line.strip())
+        if m:
+            entries[int(m.group(1))] = float(m.group(2))
+    if not entries:
+        raise RuntimeError(f"no species_N_mass entries found in {parameters_file}")
+    return [entries[i] for i in sorted(entries)]
+
+
+def species_proton_number(raw_name):
+    """Proton number Z of a species from its jaff name, e.g. "H"/"H+" -> 1, "e-" -> 0.
+
+    Microphysics' zion[] is a proton count, not a signed charge: composition()
+    forms y_e = sum(xn*zion*aion_inv), the electron fraction, which must stay
+    non-negative. Using signed charge here would make y_e (and hence mu_e = 1/y_e)
+    negative, since aion_inv is ~1823x larger for the electron than for anything
+    else.
+
+    jaff names are element symbols with a trailing charge run ("H", "H+", "e-").
+    Only the hydrogen/electron species the photoionization networks use are
+    recognised; anything else is rejected rather than guessed at, since a wrong Z
+    would silently corrupt y_e.
+    """
+    base = re.match(r"^(.*?)([+-]*)$", raw_name).group(1)
+    if base == "e":
+        return 0
+    if base == "H":
+        return 1
+    raise RuntimeError(
+        f"cannot determine proton number for species {raw_name!r}: "
+        "extend species_proton_number() with this element"
+    )
 
 
 def load_radiation_table(jaff_toml_file):
@@ -177,6 +219,31 @@ def main():
     species_enum = ",\n  ".join(species_enum_lines)
 
     spec_names = ",\n  ".join(f'\\"{n}\\"' for n in sanitized_names)
+    short_spec_names = ",\n  ".join(f'\\"{n}\\"' for n in raw_names)
+
+    # aion/zion are unused by EOS/photoionization itself, which works from
+    # spmasses/gammas -- but eos() in interfaces/eos.H unconditionally calls
+    # composition(), which forms sum(xn[n] * aion_inv[n]) and inverts it. Emitting
+    # these keeps that inversion well-defined; leaving them unset makes
+    # configure_file() substitute empty (i.e. all-zero) arrays and divide by zero.
+    masses_g = parse_species_masses_g(args.network_parameters)
+    if len(masses_g) != len(raw_names):
+        raise RuntimeError(
+            f"{args.network_parameters}: {len(raw_names)} species_N_name entries "
+            f"but {len(masses_g)} species_N_mass entries"
+        )
+    masses_amu = [m / AMU_IN_GRAMS for m in masses_g]
+    charges = [species_proton_number(n) for n in raw_names]
+
+    aion = ",\n  ".join(f"{a:.6e}" for a in masses_amu)
+    aion_inv = ",\n  ".join(f"{1.0 / a:.6e}" for a in masses_amu)
+    zion = ",\n  ".join(f"{float(z):.6e}" for z in charges)
+    aion_constexpr = "\n  ".join(
+        f"case {n}: a = {a:.6e}; break;" for n, a in zip(sanitized_names, masses_amu)
+    )
+    zion_constexpr = "\n  ".join(
+        f"case {n}: z = {float(z):.6e}; break;" for n, z in zip(sanitized_names, charges)
+    )
 
     bands_ev = parse_bands_ev(args.jaff_toml)
     num_chem_bands = len(bands_ev) - 1
@@ -192,6 +259,12 @@ def main():
         f"set(NSPEC {len(sanitized_names)})\n"
         f'set(SPECIES_ENUM\n"{species_enum}"\n)\n'
         f'set(SPEC_NAMES\n"{spec_names}"\n)\n'
+        f'set(SHORT_SPEC_NAMES\n"{short_spec_names}"\n)\n'
+        f'set(AION\n"{aion}"\n) # amu\n'
+        f'set(AION_INV\n"{aion_inv}"\n)\n'
+        f'set(ZION\n"{zion}"\n)\n'
+        f'set(AION_CONSTEXPR\n"{aion_constexpr}"\n)\n'
+        f'set(ZION_CONSTEXPR\n"{zion_constexpr}"\n)\n'
         f"set(NUM_CHEM_BANDS {num_chem_bands})\n"
         f'set(CHEM_BANDS "{chem_bands}") # eV\n'
         f"set(POWER_LAW_INDEX {power_law_index:.6e}) # jaff network.radiation.power_law_index\n"
