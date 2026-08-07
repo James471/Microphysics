@@ -34,19 +34,24 @@ POWER_LAW_INDEX, meant to be include()-d by a problem's CMakeLists.txt
 before configure_file() of network_header.template.
 """
 
-from __future__ import annotations
-
 import argparse
 import re
-import tomllib
 from pathlib import Path
+
+try:
+    import tomllib
+except ImportError:
+    try:
+        import tomli as tomllib
+    except ImportError:
+        tomllib = None
 
 VALID_CXX_IDENTIFIER = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
-def parse_species_names(parameters_file: Path) -> list[str]:
+def parse_species_names(parameters_file):
     pattern = re.compile(r'^species_(\d+)_name\s+string\s+"(.*)"\s*$')
-    entries: dict[int, str] = {}
+    entries = {}
     for line in parameters_file.read_text().splitlines():
         m = pattern.match(line.strip())
         if m:
@@ -56,7 +61,57 @@ def parse_species_names(parameters_file: Path) -> list[str]:
     return [entries[i] for i in sorted(entries)]
 
 
-def sanitize_species_name(raw_name: str) -> str:
+def load_radiation_table(jaff_toml_file):
+    """Return the [network.radiation] table from a jaff TOML config.
+
+    Uses tomllib/tomli when available (Python 3.11+, or the tomli backport).
+    Neither exists on older interpreters, and Microphysics' other build scripts
+    only require Python 3.6, so fall back to a minimal reader that extracts just
+    the keys this script needs: the bands array and power_law_index.
+    """
+    if tomllib is not None:
+        with jaff_toml_file.open("rb") as f:
+            return tomllib.load(f)["network"]["radiation"]
+
+    table = {}
+    in_section = False
+    for raw_line in jaff_toml_file.read_text().splitlines():
+        line = raw_line.split("#", 1)[0].strip()
+        if not line:
+            continue
+        if line.startswith("["):
+            in_section = line.strip("[]").strip() in ("network.radiation",)
+            continue
+        if not in_section or "=" not in line:
+            continue
+        key, value = (part.strip() for part in line.split("=", 1))
+        if value.startswith("["):
+            items = value.strip("[]").split(",")
+            table[key] = [_parse_scalar(i.strip()) for i in items if i.strip()]
+        else:
+            table[key] = _parse_scalar(value)
+
+    if not table:
+        raise RuntimeError(
+            f"{jaff_toml_file}: could not read [network.radiation]; install tomli "
+            "(pip install tomli) or use Python 3.11+"
+        )
+    return table
+
+
+def _parse_scalar(token):
+    token = token.strip()
+    if token.startswith(('"', "'")):
+        return token[1:-1]
+    if token in ("true", "false"):
+        return token == "true"
+    try:
+        return int(token)
+    except ValueError:
+        return float(token)
+
+
+def sanitize_species_name(raw_name):
     if raw_name == "e-":
         return "e"
 
@@ -72,13 +127,10 @@ def sanitize_species_name(raw_name: str) -> str:
     return base + suffix
 
 
-def parse_bands_ev(jaff_toml_file: Path) -> list[float]:
-    with jaff_toml_file.open("rb") as f:
-        config = tomllib.load(f)
+def parse_bands_ev(jaff_toml_file):
+    bands_ev = load_radiation_table(jaff_toml_file)["bands"]
 
-    bands_ev = config["network"]["radiation"]["bands"]
-
-    parsed: list[float] = []
+    parsed = []
     for i, edge in enumerate(bands_ev):
         if isinstance(edge, str):
             if edge == "inf" and i == len(bands_ev) - 1:
@@ -92,14 +144,11 @@ def parse_bands_ev(jaff_toml_file: Path) -> list[float]:
     return parsed
 
 
-def parse_power_law_index(jaff_toml_file: Path) -> float:
-    with jaff_toml_file.open("rb") as f:
-        config = tomllib.load(f)
-
-    return float(config["network"]["radiation"]["power_law_index"])
+def parse_power_law_index(jaff_toml_file):
+    return float(load_radiation_table(jaff_toml_file)["power_law_index"])
 
 
-def main() -> None:
+def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--network-parameters", required=True, type=Path,
                          help="Path to the network's own _parameters file (species_N_name entries)")
