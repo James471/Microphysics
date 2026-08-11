@@ -31,22 +31,36 @@ include(CMakePackageConfigHelpers)
 #   NETWORKPARAMFILE          The network's own _parameters file.
 #   HAS_NET_FILE              TRUE if the network has a general_null-style .net file for
 #                             write_network.py/get_naux.py to process. When FALSE, network_properties.H
-#                             comes from the problem's own CMakeLists.txt instead.
+#                             comes from NSPEC/SPECIES_ENUM/AION/... instead -- from the registry for a
+#                             hand-written network, or from write_jaff_network_vars.py for a jaff one
+#                             (see IS_JAFF).
 #   NETWORKFILE               Path to the .net file (only used if HAS_NET_FILE).
 #   NETWORKDIR                Directory holding it (only used if HAS_NET_FILE).
 #   UNIT_TEST_GATE            NAME of the BUILD_UNIT_TEST_* cache variable gating whether the unit-test
 #                             paramfiles join the write_probin.py call.
 #   IS_JAFF                   TRUE if jaff-generated, so write_jaff_network_vars.py runs to derive
-#                             NSPEC/SPECIES_ENUM/SPEC_NAMES/CHEM_BANDS.
+#                             NSPEC/SPECIES_ENUM/SPEC_NAMES/CHEM_BANDS instead of reading them from the
+#                             registry (mutually exclusive with the registry fields below).
 #   USES_INTEGRATOR_DIRS      TRUE unless the network has no burn_t-based integrator of its own
 #                             (gamma_law).
 #   EXTRA_SOURCES             Extra .cpp sources.
 #   NETWORK_INCLUDE_DIRS      Network-specific include dirs. Order and contents differ per network.
+#   NSPEC, NUM_CHEM_BANDS,    Only used when HAS_NET_FILE is FALSE and IS_JAFF is FALSE, to fill in
+#   POWER_LAW_INDEX,          network_header.template via configure_file(). Ignored for jaff networks,
+#   SPECIES_ENUM, SPEC_NAMES, which derive the same values from jaff's own _parameters/jaffgen.toml at
+#   SHORT_SPEC_NAMES, AION,   configure time instead (see IS_JAFF).
+#   AION_INV, ZION,
+#   AION_CONSTEXPR,
+#   ZION_CONSTEXPR, CHEM_BANDS
 
 set(_registry_one_value_fields
       EOSDIR EOSPARAMFILE PARAMFILE
       NETWORKPARAMFILE HAS_NET_FILE NETWORKFILE NETWORKDIR
-      UNIT_TEST_GATE IS_JAFF USES_INTEGRATOR_DIRS CACHE INTERNAL "")
+      UNIT_TEST_GATE IS_JAFF USES_INTEGRATOR_DIRS
+      NSPEC NUM_CHEM_BANDS POWER_LAW_INDEX
+      SPECIES_ENUM SPEC_NAMES SHORT_SPEC_NAMES
+      AION AION_INV ZION AION_CONSTEXPR ZION_CONSTEXPR CHEM_BANDS
+      CACHE INTERNAL "")
 set(_registry_multi_value_fields EXTRA_SOURCES NETWORK_INCLUDE_DIRS CACHE INTERNAL "")
 set(_registry_fields ${_registry_one_value_fields} ${_registry_multi_value_fields} CACHE INTERNAL "")
 
@@ -227,6 +241,23 @@ function(setup_target_for_microphysics_compilation network_name output_dir)
 
     if (_f_IS_JAFF)
       include(${jaff_network_vars_file})
+    else()
+      # Hand-written network: NSPEC/SPECIES_ENUM/AION/... come from the
+      # registry (see register_microphysics_network() field comments above)
+      # instead of from write_jaff_network_vars.py.
+      set(NSPEC "${_f_NSPEC}")
+      set(SPECIES_ENUM "${_f_SPECIES_ENUM}")
+      set(SPEC_NAMES "${_f_SPEC_NAMES}")
+      set(SHORT_SPEC_NAMES "${_f_SHORT_SPEC_NAMES}")
+      set(AION "${_f_AION}")
+      set(AION_INV "${_f_AION_INV}")
+      set(ZION "${_f_ZION}")
+      # '|' -> ';':
+      string(REPLACE "|" ";" AION_CONSTEXPR "${_f_AION_CONSTEXPR}")
+      string(REPLACE "|" ";" ZION_CONSTEXPR "${_f_ZION_CONSTEXPR}")
+      set(NUM_CHEM_BANDS "${_f_NUM_CHEM_BANDS}")
+      set(CHEM_BANDS "${_f_CHEM_BANDS}")
+      set(POWER_LAW_INDEX "${_f_POWER_LAW_INDEX}")
     endif()
 
     include_directories(
