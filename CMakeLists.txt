@@ -40,9 +40,8 @@ include(CMakePackageConfigHelpers)
 #                             NSPEC/SPECIES_ENUM/SPEC_NAMES/CHEM_BANDS.
 #   USES_INTEGRATOR_DIRS      TRUE unless the network has no burn_t-based integrator of its own
 #                             (gamma_law).
-#   EXTRA_SOURCES             Extra .cpp sources, exported as <EOSDIR>_sources.
-#   NETWORK_INCLUDE_DIRS      Network-specific include dirs appended to <EOSDIR>_dirs. Order and
-#                             contents differ per network.
+#   EXTRA_SOURCES             Extra .cpp sources.
+#   NETWORK_INCLUDE_DIRS      Network-specific include dirs. Order and contents differ per network.
 
 set(_registry_one_value_fields
       EOSDIR EOSPARAMFILE PARAMFILE
@@ -176,12 +175,17 @@ function(setup_target_for_microphysics_compilation network_name output_dir)
     set(integrator_dirs ${integrator_dir} ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/integration/utils
                          ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/integration)
   endif()
-  set(${_f_EOSDIR}_dirs ${CMAKE_BINARY_DIR} ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/util ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/util/gcem/include
-                           ${integrator_dirs} ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/interfaces
-                           ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/EOS ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/EOS/${_f_EOSDIR}
-                           ${_f_NETWORK_INCLUDE_DIRS}
-                           ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/constants
-                           PARENT_SCOPE)
+  set(_dirs ${CMAKE_BINARY_DIR} ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/util ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/util/gcem/include
+            ${integrator_dirs} ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/interfaces
+            ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/EOS ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/EOS/${_f_EOSDIR}
+            ${_f_NETWORK_INCLUDE_DIRS}
+            ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/constants)
+  # <EOSDIR>_dirs: kept for networks in the same family that already read it by
+  # that shared name (see the EOSDIR field comment above). <network_name>_dirs:
+  # always exported too, so a caller can use this target's exact network_name
+  # without needing to know which EOSDIR family it belongs to.
+  set(${_f_EOSDIR}_dirs ${_dirs} PARENT_SCOPE)
+  set(${network_name}_dirs ${_dirs} PARENT_SCOPE)
 
   set(probin_paramfiles "${_f_EOSPARAMFILE} ${_f_NETWORKPARAMFILE} ${networkparamfile} ${integratorparamfile} ${integrationparamfile}")
   if (NOT "${_f_UNIT_TEST_GATE}" STREQUAL "")
@@ -193,7 +197,10 @@ function(setup_target_for_microphysics_compilation network_name output_dir)
   execute_process(COMMAND python3 "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/util/build_scripts/write_probin.py"
                   --pa "${probin_paramfiles}" --use_namespace WORKING_DIRECTORY ${output_dir}/)
 
-  set(${_f_EOSDIR}_sources ${_f_EXTRA_SOURCES} ${output_dir}/extern_parameters.cpp PARENT_SCOPE)
+  # Same <EOSDIR>_sources / <network_name>_sources duality as <EOSDIR>_dirs above.
+  set(_sources ${_f_EXTRA_SOURCES} ${output_dir}/extern_parameters.cpp)
+  set(${_f_EOSDIR}_sources ${_sources} PARENT_SCOPE)
+  set(${network_name}_sources ${_sources} PARENT_SCOPE)
 
   if (_f_HAS_NET_FILE)
     execute_process(COMMAND ${CMAKE_COMMAND} -E env "PYTHONPATH=${PYTHONPATH}:${CMAKE_CURRENT_FUNCTION_LIST_DIR}/networks/general_null" python3 "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/networks/get_naux.py" --net "${_f_NETWORKDIR}" --microphysics_path "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/" WORKING_DIRECTORY ${output_dir}/)
@@ -212,6 +219,25 @@ function(setup_target_for_microphysics_compilation network_name output_dir)
       message(FATAL_ERROR "write_jaff_network_vars.py failed for network ${network_name}")
     endif()
     set(jaff_network_vars_file "${jaff_network_vars_file}" PARENT_SCOPE)
+  endif()
+
+  if (NOT _f_HAS_NET_FILE)
+    set(NEXTRASPEC 0)
+    set(PROPERTIES "")
+
+    if (_f_IS_JAFF)
+      include(${jaff_network_vars_file})
+    endif()
+
+    include_directories(
+      BEFORE ${_dirs} "${output_dir}"
+      "includes/extern_parameters.H" "includes/network_properties.H")
+
+    configure_file(
+        ${CMAKE_SOURCE_DIR}/src/networks/network_header.template
+        ${networkpropfile}
+        @ONLY
+    )
   endif()
 
 endfunction()
