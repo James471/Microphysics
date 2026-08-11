@@ -217,7 +217,6 @@ function(setup_target_for_microphysics_compilation network_name output_dir)
   set(${network_name}_sources ${_sources} PARENT_SCOPE)
 
   if (_f_HAS_NET_FILE)
-    execute_process(COMMAND ${CMAKE_COMMAND} -E env "PYTHONPATH=${PYTHONPATH}:${CMAKE_CURRENT_FUNCTION_LIST_DIR}/networks/general_null" python3 "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/networks/get_naux.py" --net "${_f_NETWORKDIR}" --microphysics_path "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/" WORKING_DIRECTORY ${output_dir}/)
     execute_process(COMMAND python3 "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/networks/general_null/write_network.py" --header_template "${networkheadertemplatefile}" --header_output "${networkpropfile}" -s "${_f_NETWORKFILE}" WORKING_DIRECTORY ${output_dir}/)
   endif()
 
