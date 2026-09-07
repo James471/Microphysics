@@ -24,7 +24,9 @@ using namespace network_rp;
 // For Strang evolution, this will be the number of equations we are
 // evolving.  For simplified-SDC, we will need neqs when getting the
 // reaction sources from the network's RHS.
-#if defined (PHOTOCHEMISTRY)
+#if defined (PHOTOCHEMISTRY) && defined (THERMAL_DUST_PHOTOCHEMISTRY)
+const int neqs = 1 + NumSpec + NumChemRadEqs + NumThermalBands + 1;
+#elif defined (PHOTOCHEMISTRY)
 const int neqs = 1 + NumSpec + NumChemRadEqs + NumThermalBands;
 #else
 const int neqs = 1 + NumSpec;
@@ -94,6 +96,10 @@ struct burn_t
   amrex::Real rn[NumChemRadEqs]{}; // chem bands only: (photon number density, flux-attenuation factor) pairs
   amrex::Real re_thermal[NumThermalBands]{}; // thermal bands only: energy density, no flux (isotropic, no net flux)
   amrex::Real c_hat{};
+#ifdef THERMAL_DUST_PHOTOCHEMISTRY
+  amrex::Real dust_kappa{}; // dust opacity to ionizing radiation, set by photochemistry.hpp before the burner call
+  amrex::Real e_dust_absorbed{}; // number density [cm^-3] of ionizing-band photons absorbed by dust this burn; accumulator, reset to 0 at burn start. Converted to an energy-density source term in photochemistry.hpp after the burner exits.
+#endif
 #endif
 
   // scaling used to make e we integrate dimensionless
@@ -196,6 +202,10 @@ std::ostream& operator<< (std::ostream& o, burn_t const& burn_state)
   for (double Re : burn_state.re_thermal) {
     o << Re << " ";
   }
+#ifdef THERMAL_DUST_PHOTOCHEMISTRY
+  o << "dust_kappa = " << burn_state.dust_kappa << " ";
+  o << "e_dust_absorbed = " << burn_state.e_dust_absorbed << " ";
+#endif
 #endif
   o << std::endl;
   o << "(i, j, k) = " << burn_state.i << " " << burn_state.j << " " << burn_state.k << std::endl;
@@ -269,6 +279,10 @@ void eos_to_burn (const T& eos_state, BurnT& burn_state)
         burn_state.re_thermal[n] = eos_state.re_thermal[n];
     }
     burn_state.c_hat = eos_state.c_hat;
+#ifdef THERMAL_DUST_PHOTOCHEMISTRY
+    burn_state.dust_kappa = eos_state.dust_kappa;
+    burn_state.e_dust_absorbed = eos_state.e_dust_absorbed;
+#endif
 #endif
 
     burn_state.cv   = eos_state.cv;
@@ -316,6 +330,10 @@ void burn_to_eos (const BurnT& burn_state, T& eos_state)
         eos_state.re_thermal[n] = burn_state.re_thermal[n];
     }
     eos_state.c_hat = burn_state.c_hat;
+#ifdef THERMAL_DUST_PHOTOCHEMISTRY
+    eos_state.dust_kappa = burn_state.dust_kappa;
+    eos_state.e_dust_absorbed = burn_state.e_dust_absorbed;
+#endif
 #endif
 
     eos_state.cv   = burn_state.cv;

@@ -133,7 +133,7 @@ bool rad_eq_in_error_control (const int n)
     if (n > net_ienuc + NumChemRadEqs) {
         return false;
     }
-    const int group_offset = (n - net_ienuc - 1) % MicrophysicsNumChemRadVarsPerGroup;
+    const int group_offset = (n - net_ienuc - 1) % MicrophysicsNumRadVarsPerGroup;
     return group_offset == 0;
 }
 #endif
@@ -251,7 +251,7 @@ bool valid_integrator_state (const amrex::Array1D<amrex::Real, 1, int_neqs>& y)
     }
 
 #ifdef PHOTOCHEMISTRY
-    for (int n = net_ienuc+1; n <= net_ienuc+NumChemRadEqs; n += MicrophysicsNumChemRadVarsPerGroup) {
+    for (int n = net_ienuc+1; n <= net_ienuc+NumChemRadEqs; n += MicrophysicsNumRadVarsPerGroup) {
         if (y(n) < -integrator_rp::atol_rad_num) {
             return false;
         }

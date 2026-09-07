@@ -7,8 +7,10 @@
 
 // Define the size of the ODE system that VODE will integrate
 
-#ifndef PHOTOCHEMISTRY
+#if !defined (PHOTOCHEMISTRY)
 constexpr int INT_NEQS = NumSpec + 1;
+#elif defined (THERMAL_DUST_PHOTOCHEMISTRY)
+constexpr int INT_NEQS = NumChemRadEqs + NumThermalBands + 1 + NumSpec + 1;
 #else
 constexpr int INT_NEQS = NumChemRadEqs + NumThermalBands + NumSpec + 1;
 #endif
@@ -47,6 +49,9 @@ constexpr int integrator_neqs ()
         int_neqs += NumSpec;
 #ifdef PHOTOCHEMISTRY
         int_neqs += NumChemRadEqs + NumThermalBands;
+#ifdef THERMAL_DUST_PHOTOCHEMISTRY
+        int_neqs += 1;
+#endif
 #endif
     }
 
@@ -57,6 +62,9 @@ constexpr int integrator_neqs ()
     int_neqs = NumSpec + 1;
 #ifdef PHOTOCHEMISTRY
     int_neqs += NumChemRadEqs + NumThermalBands;
+#ifdef THERMAL_DUST_PHOTOCHEMISTRY
+    int_neqs += 1;
+#endif
 #endif
 #endif
 

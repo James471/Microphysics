@@ -18,6 +18,10 @@ struct eos_t:eos_base_t {
     amrex::Real rn[NumChemRadEqs]{};
     amrex::Real re_thermal[NumThermalBands]{};
     amrex::Real c_hat{};
+#ifdef THERMAL_DUST_PHOTOCHEMISTRY
+    amrex::Real dust_kappa{};
+    amrex::Real e_dust_absorbed{};
+#endif
 #endif
 #if NAUX_NET > 0
     amrex::Real aux[NumAux]{};
@@ -67,6 +71,10 @@ struct eos_re_t:eos_base_t {
     amrex::Real rn[NumChemRadEqs]{};
     amrex::Real re_thermal[NumThermalBands]{};
     amrex::Real c_hat{};
+#ifdef THERMAL_DUST_PHOTOCHEMISTRY
+    amrex::Real dust_kappa{};
+    amrex::Real e_dust_absorbed{};
+#endif
 #endif
 #if NAUX_NET > 0
     amrex::Real aux[NumAux]{};
@@ -103,6 +111,10 @@ struct eos_rep_t:eos_base_t {
     amrex::Real rn[NumChemRadEqs]{};
     amrex::Real re_thermal[NumThermalBands]{};
     amrex::Real c_hat{};
+#ifdef THERMAL_DUST_PHOTOCHEMISTRY
+    amrex::Real dust_kappa{};
+    amrex::Real e_dust_absorbed{};
+#endif
 #endif
     amrex::Real dedT{};
     amrex::Real dedr{};
@@ -255,6 +267,10 @@ std::ostream& print_state (std::ostream& o, T const& eos_state)
         }
         o << std::endl;
         o << "c_hat = " << eos_state.c_hat << std::endl;
+#ifdef THERMAL_DUST_PHOTOCHEMISTRY
+        o << "dust_kappa = " << eos_state.dust_kappa << std::endl;
+        o << "e_dust_absorbed = " << eos_state.e_dust_absorbed << std::endl;
+#endif
 #endif
     }
     if constexpr (has_pressure<T>) {
