@@ -36,9 +36,16 @@ void actual_eos_init ()
         } \
     } while (0)
 
+    // One call per species listed in this EOS's _parameters. Each is a
+    // lookup by name that no-ops when the active network lacks that species,
+    // so networks using a subset (e.g. the hydrogen-only ones) are unaffected
+    // by entries added for larger networks.
     GET_SPECIES_PARAMS(1);
     GET_SPECIES_PARAMS(2);
     GET_SPECIES_PARAMS(3);
+    GET_SPECIES_PARAMS(4);
+    GET_SPECIES_PARAMS(5);
+    GET_SPECIES_PARAMS(6);
 
     #undef GET_SPECIES_PARAMS
 
