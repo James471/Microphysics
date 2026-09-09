@@ -15,6 +15,12 @@ SPECIES_ENUM (as the enum tag) and SPEC_NAMES (as the lookup string), so
 network_spec_index() and the enum agree on the species vocabulary by
 construction instead of by two people typing the same list twice.
 
+aion[] comes from the masses jaff writes alongside those names. zion[] is not
+in the _parameters file, so it is derived by parsing each species name into its
+constituent atoms and summing their proton numbers (see
+species_proton_number()); PROTON_NUMBERS covers every element in jaff's own
+mass table, so any network jaff can generate can be configured here.
+
 Radiation band edges come from the network's jaff.toml [radiation].bands
 list and are passed through in eV, jaff's native unit for this -- Quokka's
 own C++ side (RadSystem::GetChemBandQuanta) is responsible for converting
@@ -52,6 +58,34 @@ VALID_CXX_IDENTIFIER = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 # aion[] is conventionally in amu.
 AMU_IN_GRAMS = 1.66053906660e-24
 
+# Proton number Z of every element jaff's mass table knows, so any network it
+# can generate can be built here. Kept as a literal table rather than read from
+# jaff: this script runs under CMake execute_process() with a bare python3 and
+# must work with only the standard library, so it cannot import jaff.
+#
+# "D" is deuterium, an isotope rather than a distinct element, so it shares
+# Z = 1 with H; it is listed because primordial-chemistry networks use it.
+PROTON_NUMBERS = {
+    "H": 1, "D": 1, "He": 2, "Li": 3, "Be": 4, "B": 5, "C": 6, "N": 7,
+    "O": 8, "F": 9, "Ne": 10, "Na": 11, "Mg": 12, "Al": 13, "Si": 14,
+    "P": 15, "S": 16, "Cl": 17, "Ar": 18, "K": 19, "Ca": 20, "Sc": 21,
+    "Ti": 22, "V": 23, "Cr": 24, "Mn": 25, "Fe": 26, "Co": 27, "Ni": 28,
+    "Cu": 29, "Zn": 30, "Ga": 31, "Ge": 32, "As": 33, "Se": 34, "Br": 35,
+    "Kr": 36, "Rb": 37, "Sr": 38, "Y": 39, "Zr": 40, "Nb": 41, "Mo": 42,
+    "Ru": 44, "Rh": 45, "Pd": 46, "Ag": 47, "Cd": 48, "In": 49, "Sn": 50,
+    "Sb": 51, "Te": 52, "I": 53, "Xe": 54, "Cs": 55, "Ba": 56, "La": 57,
+    "Ce": 58, "Pr": 59, "Nd": 60, "Sm": 62, "Eu": 63, "Gd": 64, "Tb": 65,
+    "Dy": 66, "Ho": 67, "Er": 68, "Tm": 69, "Yb": 70, "Lu": 71, "Hf": 72,
+    "Ta": 73, "W": 74, "Re": 75, "Os": 76, "Ir": 77, "Pt": 78, "Au": 79,
+    "Hg": 80, "Tl": 81, "Pb": 82, "Bi": 83, "Ra": 88, "Ac": 89, "Th": 90,
+    "Pa": 91, "U": 92, "Np": 93,
+}
+
+# Element symbols longest-first, so multi-character symbols match before the
+# single-character ones they start with ("He" before "H", "Cl" before "C").
+# This mirrors how jaff itself decomposes a species name.
+_ELEMENTS_LONGEST_FIRST = sorted(PROTON_NUMBERS, key=len, reverse=True)
+
 
 def parse_species_names(parameters_file):
     pattern = re.compile(r'^species_(\d+)_name\s+string\s+"(.*)"\s*$')
@@ -79,28 +113,59 @@ def parse_species_masses_g(parameters_file):
 
 
 def species_proton_number(raw_name):
-    """Proton number Z of a species from its jaff name, e.g. "H"/"H+" -> 1, "e-" -> 0.
+    """Total proton number Z of a species from its jaff name.
+
+    Examples: "H"/"H+" -> 1, "e-" -> 0, "He++" -> 2, "H2O" -> 10, "CH4" -> 10.
 
     Microphysics' zion[] is a proton count, not a signed charge: composition()
     forms y_e = sum(xn*zion*aion_inv), the electron fraction, which must stay
     non-negative. Using signed charge here would make y_e (and hence mu_e = 1/y_e)
     negative, since aion_inv is ~1823x larger for the electron than for anything
-    else.
+    else. The trailing charge run is therefore parsed off and discarded, and Z is
+    summed over the constituent atoms -- for a molecule that sum is what zion[]
+    wants, not the Z of any single element.
 
-    jaff names are element symbols with a trailing charge run ("H", "H+", "e-").
-    Only the hydrogen/electron species the photoionization networks use are
-    recognised; anything else is rejected rather than guessed at, since a wrong Z
-    would silently corrupt y_e.
+    The name grammar follows jaff's own species decomposition: a sequence of
+    element symbols, each optionally followed by a repeat count, then a trailing
+    run of "+"/"-" giving the charge. Symbols are matched longest-first so "He"
+    is not read as H followed by unknown "e". A repeat count applies only to the
+    symbol immediately before it, so "H2O" is H,H,O rather than (HO),(HO).
     """
     base = re.match(r"^(.*?)([+-]*)$", raw_name).group(1)
+
+    # The electron is not an element and carries no protons.
     if base == "e":
         return 0
-    if base == "H":
-        return 1
-    raise RuntimeError(
-        f"cannot determine proton number for species {raw_name!r}: "
-        "extend species_proton_number() with this element"
-    )
+
+    total_z = 0
+    pos = 0
+    while pos < len(base):
+        for symbol in _ELEMENTS_LONGEST_FIRST:
+            if base.startswith(symbol, pos):
+                break
+        else:
+            raise RuntimeError(
+                f"cannot determine proton number for species {raw_name!r}: "
+                f"unrecognised element symbol at {base[pos:]!r}. If this is a "
+                "real element, add it to PROTON_NUMBERS."
+            )
+        pos += len(symbol)
+
+        # An optional repeat count for the symbol just matched.
+        count_match = re.match(r"\d+", base[pos:])
+        count = 1
+        if count_match:
+            count = int(count_match.group())
+            pos += count_match.end()
+
+        total_z += PROTON_NUMBERS[symbol] * count
+
+    if total_z == 0:
+        raise RuntimeError(
+            f"cannot determine proton number for species {raw_name!r}: "
+            "no element symbols found"
+        )
+    return total_z
 
 
 def load_radiation_table(jaff_toml_file):
@@ -154,6 +219,33 @@ def _parse_scalar(token):
 
 
 def sanitize_species_name(raw_name):
+    """Turn a jaff species name into a valid, unambiguous C++ identifier.
+
+    A trailing run of "+"/"-" becomes a charge suffix appended to the formula
+    ("H+" -> "Hp", "He++" -> "He2p"), and "e-" is spelled "e".
+
+    This encoding is NOT injective, because the suffix runs together with a
+    formula that itself ends in letters and digits. Two families of jaff names
+    can collapse onto one identifier:
+
+      * count vs subscript -- "He++" and "He2+" both give "He2p", since the "2"
+        reads either as the charge count or as part of the formula;
+      * suffix vs element symbol -- "N+" gives "Np", also the formula for
+        neptunium, and "S-" gives "Sm", samarium.
+
+    Neither can corrupt species indexing silently: main() rejects duplicate
+    sanitized names, and register_microphysics_network() turns this script's
+    nonzero exit into a CMake FATAL_ERROR. No such pair occurs in any network
+    jaff ships (checked against KIDA, RATE22, GOW and COthin, ~1100 species) --
+    real networks do not use doubly-charged ions or an "Xm"/"Xp" element
+    alongside the corresponding ion. Fixing it properly means separating the
+    suffix (e.g. "H_p"), which would rename Species::Hp in every existing
+    problem, so it is deliberately left until a network actually needs it.
+
+    The formula is passed through unchanged, so it must already be
+    identifier-safe; main() validates that too. Notably jaff's isomer prefixes
+    ("c-C3H2" for the cyclic form) are not handled and will be rejected there.
+    """
     if raw_name == "e-":
         return "e"
 
