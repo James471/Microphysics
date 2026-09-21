@@ -7,13 +7,18 @@ already emits.
 
 Species names and order come from the network's own _parameters file
 (species_N_name entries, written by jaff in its own species order). jaff's
-raw names (e.g. "H+", "e-") are not valid C++ identifiers, so each name is
-sanitized into one here: a trailing run of "+"/"-" characters is collapsed
-into a count+sign suffix (single charge: "p"/"m"; multi-charge: "<n>p"/"<n>m"),
-and "e-" is special-cased to "e". The same sanitized name is used for both
-SPECIES_ENUM (as the enum tag) and SPEC_NAMES (as the lookup string), so
-network_spec_index() and the enum agree on the species vocabulary by
-construction instead of by two people typing the same list twice.
+raw names (e.g. "H+", "e-", "c-C3H2", "H2O_DUST") are not valid or not
+unambiguous C++ identifiers, so each name is sanitized into one here: the
+formula is kept as-is and every structural marker becomes an "_"-separated
+suffix ("H+" -> "H_p", "c-C3H2+" -> "C3H2_c_p", "H2O_DUST" -> "H2O_dust"). See
+sanitize_species_name() for the full set of rules and for why "_" has to be a
+reserved separator rather than the markers simply running onto the formula.
+
+The same sanitized name is used for both SPECIES_ENUM (as the enum tag) and
+SPEC_NAMES (as the lookup string), so network_spec_index() and the enum agree
+on the species vocabulary by construction instead of by two people typing the
+same list twice. SHORT_SPEC_NAMES keeps jaff's raw spelling, so the original
+name is always recoverable from the generated header.
 
 aion[] comes from the masses jaff writes alongside those names. zion[] is not
 in the _parameters file, so it is derived by parsing each species name into its
@@ -53,6 +58,32 @@ except ImportError:
         tomllib = None
 
 VALID_CXX_IDENTIFIER = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+# jaff's structural name decorations, stripped/rewritten by
+# sanitize_species_name() and species_proton_number(). "_" is reserved as the
+# separator between a formula and these markers, so a marker can never be
+# confused with formula content (see sanitize_species_name).
+#
+# Isomer prefixes: the cyclic/linear/triplet forms of the same formula.
+ISOMER_PREFIXES = ("c-", "l-", "t-")
+
+# Ice-mantle phases of a molecule frozen onto a grain (uclchem).
+PHASE_SUFFIXES = ("_BULK", "_DUST")
+
+# jaff's reaction-partner sentinels: not species at all, but emitted as
+# reactants/products by the parser. Each has mass 0 in jaff's own atom_mass.csv,
+# so a proton number of zero is their definition rather than a fallback.
+PSEUDO_SPECIES = frozenset({"_CR", "_CRP", "_CRPHOT", "_PHOTON", "_GRAIN", "_DUMMY"})
+
+# Dust grains are macroscopic particles ("GRAIN0", "GRAIN-"), not molecules, so
+# they have no meaningful proton count to contribute to y_e.
+GRAIN_PREFIX = "GRAIN"
+
+# KIDA spells a species adsorbed on a grain surface with a leading "X": "XH" is
+# H sitting on a surface site (H -> XH, then XH + XH -> H2, the standard surface
+# H2 formation route). The following character must be upper-case so real
+# elements starting with X -- xenon, "Xe" -- are not mistaken for a prefix.
+SURFACE_ADSORBED_RE = re.compile(r"^X[A-Z]")
 
 # 1 atomic mass unit in grams; jaff writes species_N_mass in grams, while
 # aion[] is conventionally in amu.
@@ -112,6 +143,46 @@ def parse_species_masses_g(parameters_file):
     return [entries[i] for i in sorted(entries)]
 
 
+def split_species_name(raw_name):
+    """Split a jaff species name into its formula and structural decorations.
+
+    Returns (formula, phase, adsorbed, isomer, charge_run), where the formula is
+    the bare chemical formula and the rest are the markers stripped off it.
+    ``phase`` is "" or one of PHASE_SUFFIXES; ``adsorbed`` is True for a
+    surface-adsorbed species; ``isomer`` is "" or one of "c"/"l"/"t";
+    ``charge_run`` is the trailing run of "+"/"-" ("" if neutral).
+
+    Both sanitize_species_name() and species_proton_number() decompose names
+    through here, so the identifier and the proton number can never disagree
+    about what part of a name is formula and what part is decoration.
+    """
+    name = raw_name
+
+    adsorbed = False
+    if SURFACE_ADSORBED_RE.match(name):
+        adsorbed = True
+        name = name[1:]
+
+    isomer = ""
+    for prefix in ISOMER_PREFIXES:
+        if name.startswith(prefix):
+            isomer = prefix[0]
+            name = name[len(prefix):]
+            break
+
+    # Taken off before the charge run so the charge parses against the formula
+    # itself rather than against the phase suffix's trailing letters.
+    phase = ""
+    for suffix in PHASE_SUFFIXES:
+        if name.endswith(suffix):
+            phase = suffix
+            name = name[: -len(suffix)]
+            break
+
+    m = re.match(r"^(.*?)([+-]*)$", name)
+    return m.group(1), phase, adsorbed, isomer, m.group(2)
+
+
 def species_proton_number(raw_name):
     """Total proton number Z of a species from its jaff name.
 
@@ -130,12 +201,34 @@ def species_proton_number(raw_name):
     run of "+"/"-" giving the charge. Symbols are matched longest-first so "He"
     is not read as H followed by unknown "e". A repeat count applies only to the
     symbol immediately before it, so "H2O" is H,H,O rather than (HO),(HO).
+
+    Structural decorations are stripped before decomposition, so a decorated
+    species inherits the proton number of its underlying formula: "H2O_DUST"
+    and "XH" give Z of "H2O" (10) and "H" (1). Three families carry no protons
+    of their own: the electron, jaff's zero-mass reaction-partner sentinels
+    (PSEUDO_SPECIES), and dust grains, which are macroscopic particles rather
+    than molecules.
     """
-    base = re.match(r"^(.*?)([+-]*)$", raw_name).group(1)
+    # Sentinels, not species: zero mass in jaff's own table.
+    if raw_name in PSEUDO_SPECIES:
+        return 0
+
+    base, _phase, _adsorbed, _isomer, _charge = split_species_name(raw_name)
 
     # The electron is not an element and carries no protons.
     if base == "e":
         return 0
+
+    if base.startswith(GRAIN_PREFIX):
+        return 0
+
+    # A trailing "x" marks a lumped species with an unspecified hydrogen count
+    # ("CHx", "OHx" in GOW), not an element. jaff itself strips it to recover
+    # the base formula (Reaction.serialize), so "CHx" is counted as "CH". The
+    # count is by definition approximate for a lumped species; this is the same
+    # approximation jaff makes internally.
+    if base.endswith("x"):
+        base = base[:-1]
 
     total_z = 0
     pos = 0
@@ -221,44 +314,62 @@ def _parse_scalar(token):
 def sanitize_species_name(raw_name):
     """Turn a jaff species name into a valid, unambiguous C++ identifier.
 
-    A trailing run of "+"/"-" becomes a charge suffix appended to the formula
-    ("H+" -> "Hp", "He++" -> "He2p"), and "e-" is spelled "e".
+    The formula comes first and every structural marker jaff spells with a
+    prefix or punctuation becomes an "_"-separated suffix, in the fixed order
+    formula + phase + adsorbed + isomer + charge:
 
-    This encoding is NOT injective, because the suffix runs together with a
-    formula that itself ends in letters and digits. Two families of jaff names
-    can collapse onto one identifier:
+      * charge -- a trailing run of "+"/"-" becomes "_p"/"_m", or "_<n>p"/
+        "_<n>m" for multiply-charged ions:  "H+" -> "H_p", "He++" -> "He_2p";
+      * the electron is spelled "e";
+      * isomer prefixes become a trailing "_c"/"_l"/"_t":
+        "c-C3H2+" -> "C3H2_c_p";
+      * ice phases are lower-cased in place:  "H2O_DUST" -> "H2O_dust";
+      * a surface-adsorbed species trades its "X" prefix for "_ads":
+        "XH" -> "H_ads";
+      * jaff's reaction-partner sentinels drop their leading "_":
+        "_CRPHOT" -> "CRPHOT".
 
-      * count vs subscript -- "He++" and "He2+" both give "He2p", since the "2"
-        reads either as the charge count or as part of the formula;
-      * suffix vs element symbol -- "N+" gives "Np", also the formula for
-        neptunium, and "S-" gives "Sm", samarium.
+    Reserving "_" as the separator is what makes the encoding injective. An
+    unseparated suffix runs together with a formula that itself ends in letters
+    and digits, so "He++" and "He2+" both collapse onto "He2p", and "N+" gives
+    "Np", also the formula for neptunium. Separated, the two readings of the
+    digit stay distinct by construction -- "He++" -> "He_2p" against "He2+" ->
+    "He2_p" -- rather than by luck. That distinction is not hypothetical: 154 of
+    the ~940 species jaff ships end in a digit immediately before their charge
+    run ("C2+" -> "C2_p"), and they avoid collision today only because no
+    shipped network happens to also contain the doubly-charged twin.
 
-    Neither can corrupt species indexing silently: main() rejects duplicate
-    sanitized names, and register_microphysics_network() turns this script's
-    nonzero exit into a CMake FATAL_ERROR. No such pair occurs in any network
-    jaff ships (checked against KIDA, RATE22, GOW and COthin, ~1100 species) --
-    real networks do not use doubly-charged ions or an "Xm"/"Xp" element
-    alongside the corresponding ion. Fixing it properly means separating the
-    suffix (e.g. "H_p"), which would rename Species::Hp in every existing
-    problem, so it is deliberately left until a network actually needs it.
-
-    The formula is passed through unchanged, so it must already be
-    identifier-safe; main() validates that too. Notably jaff's isomer prefixes
-    ("c-C3H2" for the cyclic form) are not handled and will be rejected there.
+    Markers are stripped by split_species_name(), which species_proton_number()
+    also uses, so the identifier and the proton number always agree on which
+    part of a name is formula. The formula itself is passed through unchanged
+    and must already be identifier-safe; main() validates that, and rejects
+    duplicate sanitized names -- register_microphysics_network() turns this
+    script's nonzero exit into a CMake FATAL_ERROR.
     """
     if raw_name == "e-":
         return "e"
 
-    m = re.match(r"^(.*?)([+-]*)$", raw_name)
-    base, charge_run = m.group(1), m.group(2)
+    if raw_name in PSEUDO_SPECIES:
+        return raw_name.lstrip("_")
 
-    if not charge_run:
-        return base
+    base, phase, adsorbed, isomer, charge_run = split_species_name(raw_name)
 
-    sign = "p" if charge_run[0] == "+" else "m"
-    n = len(charge_run)
-    suffix = sign if n == 1 else f"{n}{sign}"
-    return base + suffix
+    # Lower-cased so the marker reads as a suffix rather than as part of the
+    # formula, matching the casing of every other marker here.
+    name = base + phase.lower()
+
+    if adsorbed:
+        name += "_ads"
+
+    if isomer:
+        name += "_" + isomer
+
+    if charge_run:
+        sign = "p" if charge_run[0] == "+" else "m"
+        n = len(charge_run)
+        name += "_" + (sign if n == 1 else f"{n}{sign}")
+
+    return name
 
 
 def parse_bands_ev(jaff_toml_file):

@@ -11,6 +11,7 @@
 #include <fundamental_constants.H>
 #include <extern_parameters.H>
 #include <cmath>
+#include <string>
 #include <actual_eos_data.H>
 
 const std::string eos_name = "multigamma";
@@ -19,20 +20,18 @@ inline
 void actual_eos_init ()
 {
 
-    // Set the gammas & masses for the species
-
-    for (int n = 0; n < NumSpec; ++n) {
-        gammas[n] = eos_rp::eos_gamma_default;
-        spmasses[n] = 1.67353251819e-24;
-    }
+    bool matched[NumSpec] = {false};
 
     int idx;
-    // Set the gammas & masses for the species
+    // Set the gammas & masses for the species.
+    // The lookup is by RAW species name -- jaff's own spelling, "H+" rather
+    // than "H_p"
     #define GET_SPECIES_PARAMS(num) do { \
-        idx = network_spec_index(eos_rp::species_##num##_name); \
+        idx = network_spec_index_raw(eos_rp::species_##num##_name); \
         if (idx >= 0) { \
             gammas[idx] = eos_rp::species_##num##_gamma; \
             spmasses[idx] = eos_rp::species_##num##_mass; \
+            matched[idx] = true; \
         } \
     } while (0)
 
@@ -48,6 +47,22 @@ void actual_eos_init ()
     GET_SPECIES_PARAMS(6);
 
     #undef GET_SPECIES_PARAMS
+
+    std::string missing;
+    for (int n = 0; n < NumSpec; ++n) {
+        if (!matched[n]) {
+            if (!missing.empty()) {
+                missing += ", ";
+            }
+            missing += short_spec_names_cxx[n];
+        }
+    }
+    if (!missing.empty()) {
+        amrex::Abort("photoionization EOS: no gamma/mass entry for network species: "
+                     + missing
+                     + ". Add them to EOS/photoionization/_parameters (by raw name, e.g. \"H+\")"
+                       " and add a matching GET_SPECIES_PARAMS call in actual_eos_init().");
+    }
 
 }
 

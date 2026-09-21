@@ -1,22 +1,17 @@
 @namespace: eos
 
-eos_gamma_default       real          1.4
-
 # Define the specie names, and their masses and gammas.
 #
-# Names must match the C++-sanitized species names in spec_names_cxx[] (what
-# network_spec_index() compares against), not jaff's raw names: a trailing
-# charge run is collapsed to a count+sign suffix ("H+" -> "Hp",
-# "He++" -> "He2p") and "e-" is spelled "e". See
-# util/build_scripts/write_jaff_network_vars.py:sanitize_species_name().
+# There is no default gamma or mass: every species the network defines must be
+# listed here, and actual_eos_init() aborts naming any that is not.
 #
-# A network need not use all of these. actual_eos_init() looks each name up and
-# skips the ones its network does not define, so the hydrogen-only networks
-# ignore the helium entries. Species a network DOES define but that are missing
-# here would silently fall back to eos_gamma_default and a proton-like mass, so
-# every species of every network using this EOS must be listed.
+# Names are the network's RAW species names -- jaff's own spelling, exactly as
+# they appear in the network file ("H+", "e-", "He++").
+#
+# Adding a species means adding an entry here AND a matching
+# GET_SPECIES_PARAMS(N) call in actual_eos_init().
 
-species_1_name          string     "e"
+species_1_name          string     "e-"
 species_1_gamma         real          5./3.
 species_1_mass          real          9.10938371e-28
 
@@ -24,7 +19,7 @@ species_2_name          string     "H"
 species_2_gamma         real          5./3.
 species_2_mass          real          1.673773e-24
 
-species_3_name          string     "Hp"
+species_3_name          string     "H+"
 species_3_gamma         real          5./3.
 species_3_mass          real          1.6728620616289998e-24
 
@@ -32,10 +27,10 @@ species_4_name          string     "He"
 species_4_gamma         real          5./3.
 species_4_mass          real          6.646473e-24
 
-species_5_name          string     "Hep"
+species_5_name          string     "He+"
 species_5_gamma         real          5./3.
 species_5_mass          real          6.645562061629e-24
 
-species_6_name          string     "He2p"
+species_6_name          string     "He++"
 species_6_gamma         real          5./3.
 species_6_mass          real          6.644651123258e-24
