@@ -52,12 +52,13 @@ include(CMakePackageConfigHelpers)
 #   AION_INV, ZION,
 #   AION_CONSTEXPR,
 #   ZION_CONSTEXPR, CHEM_BANDS
+#   NUM_THERMAL_BANDS         Number of thermal radiation bands the network emits into (0 if none).
 
 set(_registry_one_value_fields
       EOSDIR EOSPARAMFILE PARAMFILE
       NETWORKPARAMFILE HAS_NET_FILE NETWORKFILE NETWORKDIR
       UNIT_TEST_GATE IS_JAFF USES_INTEGRATOR_DIRS
-      NSPEC NUM_CHEM_BANDS POWER_LAW_INDEX
+      NSPEC NUM_CHEM_BANDS POWER_LAW_INDEX NUM_THERMAL_BANDS
       SPECIES_ENUM SPEC_NAMES SHORT_SPEC_NAMES
       AION AION_INV ZION AION_CONSTEXPR ZION_CONSTEXPR CHEM_BANDS
       CACHE INTERNAL "")
@@ -237,6 +238,12 @@ function(setup_target_for_microphysics_compilation network_name output_dir)
   if (NOT _f_HAS_NET_FILE)
     set(NEXTRASPEC 0)
     set(PROPERTIES "")
+
+    if ("${_f_NUM_THERMAL_BANDS}" STREQUAL "")
+      set(NUM_THERMAL_BANDS 0)
+    else()
+      set(NUM_THERMAL_BANDS "${_f_NUM_THERMAL_BANDS}")
+    endif()
 
     if (_f_IS_JAFF)
       include(${jaff_network_vars_file})
