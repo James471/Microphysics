@@ -40,7 +40,18 @@ include(CMakePackageConfigHelpers)
 #                             paramfiles join the write_probin.py call.
 #   IS_JAFF                   TRUE if jaff-generated, so write_jaff_network_vars.py runs to derive
 #                             NSPEC/SPECIES_ENUM/SPEC_NAMES/CHEM_BANDS instead of reading them from the
-#                             registry (mutually exclusive with the registry fields below).
+#                             registry (mutually exclusive with the registry fields below). Also adds
+#                             -DIS_JAFF to the target(s) the caller adds afterwards, for jaff-specific
+#                             C++ code paths (e.g. integrator_rhs_strang.H/integrator_rhs_sdc.H skipping
+#                             the redundant pd.zero() that jaff-generated Jacobians already do).
+#   JAFF_TOML                 Path to the network's jaffgen.toml. Only used if IS_JAFF. Out-of-tree
+#                             networks (e.g. Quokka's) live outside Microphysics, so this must be
+#                             supplied by the registry entry rather than derived from a path relative
+#                             to Microphysics itself.
+#   HEADER_TEMPLATE           Path to the network_header.template used by configure_file() when
+#                             HAS_NET_FILE is FALSE. Defaults to Microphysics's own
+#                             networks/general_null/network_header.template. Out-of-tree networks
+#                             (e.g. Quokka's) that need extra substitution variables supply their own.
 #   USES_INTEGRATOR_DIRS      TRUE unless the network has no burn_t-based integrator of its own
 #                             (gamma_law).
 #   EXTRA_SOURCES             Extra .cpp sources.
@@ -56,7 +67,7 @@ include(CMakePackageConfigHelpers)
 set(_registry_one_value_fields
       EOSDIR EOSPARAMFILE PARAMFILE
       NETWORKPARAMFILE HAS_NET_FILE NETWORKFILE NETWORKDIR
-      UNIT_TEST_GATE IS_JAFF USES_INTEGRATOR_DIRS
+      UNIT_TEST_GATE IS_JAFF JAFF_TOML HEADER_TEMPLATE USES_INTEGRATOR_DIRS
       NSPEC NUM_CHEM_BANDS POWER_LAW_INDEX
       SPECIES_ENUM SPEC_NAMES SHORT_SPEC_NAMES
       AION AION_INV ZION AION_CONSTEXPR ZION_CONSTEXPR CHEM_BANDS
@@ -201,6 +212,10 @@ function(setup_target_for_microphysics_compilation network_name output_dir)
   set(${_f_EOSDIR}_dirs ${_dirs} PARENT_SCOPE)
   set(${network_name}_dirs ${_dirs} PARENT_SCOPE)
 
+  if (_f_IS_JAFF)
+    add_compile_definitions(IS_JAFF)
+  endif()
+
   set(probin_paramfiles "${_f_EOSPARAMFILE} ${_f_NETWORKPARAMFILE} ${networkparamfile} ${integratorparamfile} ${integrationparamfile}")
   if (NOT "${_f_UNIT_TEST_GATE}" STREQUAL "")
     if (${_f_UNIT_TEST_GATE})
@@ -221,10 +236,13 @@ function(setup_target_for_microphysics_compilation network_name output_dir)
   endif()
 
   if (_f_IS_JAFF)
+    if ("${_f_JAFF_TOML}" STREQUAL "")
+      message(FATAL_ERROR "setup_target_for_microphysics_compilation(${network_name}): IS_JAFF is TRUE but JAFF_TOML was not given (via the registry or an override)")
+    endif()
     set(jaff_network_vars_file "${output_dir}/jaff_network_vars.cmake")
     execute_process(COMMAND python3 "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/util/build_scripts/write_jaff_network_vars.py"
                     --network-parameters "${_f_NETWORKPARAMFILE}"
-                    --jaff-toml "${CMAKE_SOURCE_DIR}/src/networks/${network_name}/jaffgen.toml"
+                    --jaff-toml "${_f_JAFF_TOML}"
                     --output "${jaff_network_vars_file}"
                     WORKING_DIRECTORY ${output_dir}/
                     RESULT_VARIABLE jaff_network_vars_result)
@@ -263,8 +281,13 @@ function(setup_target_for_microphysics_compilation network_name output_dir)
       BEFORE ${_dirs} "${output_dir}"
       "includes/extern_parameters.H" "includes/network_properties.H")
 
+    set(_header_template "${networkheadertemplatefile}")
+    if (NOT "${_f_HEADER_TEMPLATE}" STREQUAL "")
+      set(_header_template "${_f_HEADER_TEMPLATE}")
+    endif()
+
     configure_file(
-        ${CMAKE_SOURCE_DIR}/src/networks/network_header.template
+        ${_header_template}
         ${networkpropfile}
         @ONLY
     )
